@@ -4,6 +4,9 @@
     <RootNamespace>PigeonPost</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="PigeonPost.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Pontifex" Version="0.1.2-dev.0" />
     <PackageReference Include="Pontifex.Transport.Direct" Version="0.1.1-dev.0" />
     <PackageReference Include="Pontifex.Transport.Tcp" Version="0.1.1-dev.0" />
