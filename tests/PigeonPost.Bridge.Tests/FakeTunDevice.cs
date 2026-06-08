@@ -9,10 +9,16 @@ namespace PigeonPost.Bridge.Tests;
 internal class FakeTunDevice : ITunDevice
 {
     private readonly Queue<byte[]> _incoming = new();
-    public Queue<byte[]> Sent { get; } = new();
+    private readonly object _lock = new();
 
-    public string Name => "fake";
-    public bool IsOpen { get; private set; }
+    public string Name => "fake_tun";
+    public bool IsOpen { get; private set; } = true;
+    public List<byte[]> WrittenPackets { get; } = new();
+
+    public void EnqueueIncoming(byte[] packet)
+    {
+        lock (_lock) _incoming.Enqueue(packet);
+    }
 
     public void Open(string name)
     {
@@ -21,22 +27,23 @@ internal class FakeTunDevice : ITunDevice
 
     public int Read(byte[] buffer)
     {
-        while (_incoming.Count == 0)
+        lock (_lock)
         {
-            Thread.Sleep(10);
-        }
+            if (_incoming.Count == 0)
+            {
+                Thread.Sleep(50);
+                return 0;
+            }
 
-        byte[] data = _incoming.Dequeue();
-        int count = Math.Min(data.Length, buffer.Length);
-        Array.Copy(data, 0, buffer, 0, count);
-        return count;
+            var packet = _incoming.Dequeue();
+            Array.Copy(packet, buffer, packet.Length);
+            return packet.Length;
+        }
     }
 
     public void Write(byte[] buffer)
     {
-        byte[] copy = new byte[buffer.Length];
-        Array.Copy(buffer, copy, buffer.Length);
-        Sent.Enqueue(copy);
+        WrittenPackets.Add((byte[])buffer.Clone());
     }
 
     public ValueTask<int> ReadAsync(byte[] buffer, CancellationToken ct = default)
@@ -47,11 +54,6 @@ internal class FakeTunDevice : ITunDevice
     public ValueTask WriteAsync(byte[] buffer, CancellationToken ct = default)
     {
         return new ValueTask(Task.Run(() => Write(buffer), ct));
-    }
-
-    public void EnqueueIncoming(byte[] data)
-    {
-        _incoming.Enqueue(data);
     }
 
     public void Close()
