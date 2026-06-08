@@ -6,6 +6,7 @@
     <PackageReference Include="Pontifex" Version="0.1.2-dev.0" />
     <InternalsVisibleTo Include="PigeonPost.Bridge.Tests" />
     <InternalsVisibleTo Include="PigeonPost" />
+    <InternalsVisibleTo Include="PigeonPost.Tests" />
     <PackageReference Include="Pontifex.Transport.Direct" Version="0.1.1-dev.0" />
     <PackageReference Include="Pontifex.Transport.Tcp" Version="0.1.1-dev.0" />
     <PackageReference Include="Scriba" Version="0.2.2-dev.1" />
