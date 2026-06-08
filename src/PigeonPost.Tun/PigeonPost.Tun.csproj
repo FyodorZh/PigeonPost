@@ -1,5 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>PigeonPost.Tun</RootNamespace>
+    <NoWarn>$(NoWarn);CS8981</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>PigeonPost.Tun.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>
