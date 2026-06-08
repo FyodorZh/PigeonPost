@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using System.Text;
 using Actuarius.Memory;
 using Pontifex;
@@ -20,7 +21,7 @@ namespace PigeonPost
             
             public void OnDisconnected(StopReason reason)
             {
-                // Handle disconnection logic
+                // Handle disconnection logic 
             }
 
             public void OnReceived(UnionDataList receivedBuffer)
