@@ -60,6 +60,7 @@ internal sealed class App
 
         using var tun = new TunDevice();
         tun.Open(tunName);
+        tun.SetSendBufferSize(1048576);
         _logger.i($"TUN device '{tunName}' opened.");
 
         var buffer = new PacketBuffer(_config.BufferSizeBytes);
@@ -107,6 +108,7 @@ internal sealed class App
 
         using var tun = new TunDevice();
         tun.Open(tunName);
+        tun.SetSendBufferSize(1048576);
         _logger.i($"TUN device '{tunName}' opened.");
 
         var buffer = new PacketBuffer(_config.BufferSizeBytes);
@@ -164,7 +166,9 @@ internal sealed class App
         using var tun1 = new TunDevice();
         using var tun2 = new TunDevice();
         tun1.Open(tunName1);
+        tun1.SetSendBufferSize(1048576);
         tun2.Open(tunName2);
+        tun2.SetSendBufferSize(1048576);
         _logger.i($"TUN devices '{tunName1}' and '{tunName2}' opened.");
 
         var buffer1 = new PacketBuffer(_config.BufferSizeBytes);
@@ -180,11 +184,11 @@ internal sealed class App
         var client = new AckRawDirectClient(serverNameActual, _logger, MemoryRental.Shared);
         client.Init(new BridgeClientHandler(bridge2));
 
-        bridge1.Start();
-        bridge2.Start();
-
         server.Start(reason => _logger.i($"Debug server stopped: {reason.Type}"));
         client.Start(reason => _logger.i($"Debug client stopped: {reason.Type}"));
+
+        bridge1.Start();
+        bridge2.Start();
 
         _logger.i($"Debug mode running: {tunName1} ←→ {tunName2}");
 

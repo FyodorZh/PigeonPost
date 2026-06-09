@@ -40,6 +40,14 @@ public sealed class TunDevice : ITunDevice
         _name = name;
     }
 
+    public void SetSendBufferSize(int size)
+    {
+        if (!IsOpen) throw new InvalidOperationException("TUN device not open.");
+        int result = NativeMethods.ioctl(_fd, TunConstants.TUNSETSNDBUF, ref size);
+        if (result < 0)
+            throw new IOException($"TUNSETSNDBUF failed: errno={Marshal.GetLastWin32Error()}");
+    }
+
     public int Read(byte[] buffer)
     {
         if (!IsOpen) throw new InvalidOperationException("TUN device not open.");

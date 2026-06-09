@@ -16,6 +16,9 @@ internal static class NativeMethods
     public static extern int ioctl(int fd, nuint request, ref ifreq ifr);
 
     [DllImport(Libc, SetLastError = true)]
+    public static extern int ioctl(int fd, nuint request, ref int value);
+
+    [DllImport(Libc, SetLastError = true)]
     public static extern nint read(int fd, byte[] buffer, nint count);
 
     [DllImport(Libc, SetLastError = true)]
