@@ -1,0 +1,70 @@
+services:
+  server:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+      additional_contexts:
+        - nugets=/Users/fyodor/Development/nugets
+    image: pigeonpost:latest
+    container_name: pigeonpost-server
+    hostname: pigeonpost-server
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    environment:
+      TUN_NAME: tun0
+      TUN_IP: 10.0.0.1
+      PEER_IP: 10.0.0.2
+    command: --role server --tun tun0 --url 'tcp|0.0.0.0:9000/30'
+    networks:
+      - pigeon-net
+
+  client:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+      additional_contexts:
+        - nugets=/Users/fyodor/Development/nugets
+    image: pigeonpost:latest
+    container_name: pigeonpost-client
+    hostname: pigeonpost-client
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    depends_on:
+      - server
+    environment:
+      TUN_NAME: tun0
+      TUN_IP: 10.0.0.2
+      PEER_IP: 10.0.0.1
+    command: --role client --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
+    networks:
+      - pigeon-net
+
+  iperf-server:
+    image: networkstatic/iperf3
+    network_mode: "service:server"
+    depends_on:
+      server:
+        condition: service_started
+    entrypoint: ["/bin/sh", "/test/iperf-server.sh"]
+    volumes:
+      - ./iperf-server.sh:/test/iperf-server.sh:ro
+
+  iperf-client:
+    image: networkstatic/iperf3
+    network_mode: "service:client"
+    depends_on:
+      client:
+        condition: service_started
+      iperf-server:
+        condition: service_started
+    entrypoint: ["/bin/sh", "/test/iperf-client.sh"]
+    volumes:
+      - ./iperf-client.sh:/test/iperf-client.sh:ro
+
+networks:
+  pigeon-net:
+    driver: bridge

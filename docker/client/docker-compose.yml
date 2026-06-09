@@ -1,0 +1,19 @@
+services:
+  pigeonpost:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+      additional_contexts:
+        - nugets=/Users/fyodor/Development/nugets
+    image: pigeonpost:latest
+    container_name: pigeonpost-client
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    environment:
+      TUN_NAME: tun0
+      TUN_IP: 10.0.0.2
+      PEER_IP: 10.0.0.1
+    command: --role client --tun tun0 --url tcp|${SERVER_ADDR:?Set SERVER_ADDR to the server's public IP}:9000/30
+    restart: unless-stopped
