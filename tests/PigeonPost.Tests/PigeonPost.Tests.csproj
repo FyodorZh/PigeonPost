@@ -10,7 +10,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="Pontifex" Version="0.1.2-dev.0" />
     <PackageReference Include="Pontifex.Transport.Direct" Version="0.1.1-dev.0" />
-    <PackageReference Include="Scriba" Version="0.2.2-dev.1" />
+    <PackageReference Include="Scriba" Version="0.2.3-dev.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\PigeonPost.Tun\PigeonPost.Tun.csproj" />
