@@ -7,6 +7,7 @@ services:
         - nugets=/Users/fyodor/Development/nugets
     image: pigeonpost:latest
     container_name: pigeonpost-server
+    network_mode: host
     cap_add:
       - NET_ADMIN
     devices:
@@ -15,7 +16,5 @@ services:
       TUN_NAME: tun0
       TUN_IP: 10.0.0.1
       PEER_IP: 10.0.0.2
-    ports:
-      - "9000:9000"
-    command: --role server --tun tun0 --url tcp|0.0.0.0:9000/30
+    command: --role server --tun tun0 --url ${PIGEON_URL:?Set PIGEON_URL}
     restart: unless-stopped
