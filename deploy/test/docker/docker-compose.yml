@@ -2,7 +2,7 @@ services:
   server:
     build:
       context: ../../..
-      dockerfile: deploy/docker/Dockerfile
+      dockerfile: docker/Dockerfile
       additional_contexts:
         - nugets=/Users/fyodor/Development/nugets
     image: pigeonpost:latest
@@ -23,7 +23,7 @@ services:
   client:
     build:
       context: ../../..
-      dockerfile: deploy/docker/Dockerfile
+      dockerfile: docker/Dockerfile
       additional_contexts:
         - nugets=/Users/fyodor/Development/nugets
     image: pigeonpost:latest

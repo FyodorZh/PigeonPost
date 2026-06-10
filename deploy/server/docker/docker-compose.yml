@@ -2,7 +2,7 @@ services:
   pigeonpost:
     build:
       context: ../../..
-      dockerfile: deploy/docker/Dockerfile
+      dockerfile: docker/Dockerfile
       additional_contexts:
         - nugets=/Users/fyodor/Development/nugets
     image: pigeonpost:latest

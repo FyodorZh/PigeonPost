@@ -24,10 +24,12 @@ PigeonPost.sln
 │   ├── PigeonPost.Bridge.Tests/ NUnit — packet buffer, bridge, direct transport
 │   └── PigeonPost.Tun.Tests/   NUnit — TUN device contracts, constants, P/Invoke
 ├── deploy/
-│   ├── docker/                   Shared Dockerfile + docker-entrypoint.sh
-│   ├── client/docker/            docker-compose.yml + deploy-docker.sh + deploy-plain.sh + setup.sh
-│   ├── server/docker/            docker-compose.yml + deploy-docker.sh + deploy-plain.sh + setup.sh
+│   ├── client/                   deploy-docker.sh + deploy-plain.sh + pre-deploy.sh
+│   │   └── docker/               docker-compose.yml
+│   ├── server/                   deploy-docker.sh + deploy-plain.sh + pre-deploy.sh
+│   │   └── docker/               docker-compose.yml
 │   └── test/docker/              docker-compose.yml + iperf harness
+├── docker/                   Shared Dockerfile + docker-entrypoint.sh
 ├── Directory.Build.props        Global: net10.0, no implicit usings, nullable, warn-as-error
 ├── nuget.config                 Sources: local ./nugets + nuget.org
 └── pontifex.md                  Pontifex transport library reference (1296 lines)
@@ -47,7 +49,7 @@ The connection model is strictly **1-to-1** per app instance: one server ↔ one
 
 ### TUN devices are never created by the app
 The app only opens existing TUN devices via `/dev/net/tun`. IP addresses, routes, and
-device creation are handled externally (by `docker-entrypoint.sh` or host `setup.sh`).
+device creation are handled externally (by `docker-entrypoint.sh` or host `pre-deploy.sh`).
 This separation avoids the app needing `NET_ADMIN` for device creation — only the
 container/host scripts need root.
 
@@ -165,13 +167,13 @@ the local feed and nuget.org.
 
 ## Deploy Configuration
 
-### Shared Dockerfile (`deploy/docker/Dockerfile`)
+### Shared Dockerfile (`docker/Dockerfile`)
 All roles share the same multi-stage build:
 - **Build stage**: `dotnet/sdk:10.0` — copies local nugets, adds source, restores, publishes to `/app`
 - **Runtime stage**: `dotnet/runtime:10.0` — installs `iproute2`, copies app + entrypoint
 - Entrypoint: `docker-entrypoint.sh` which creates/configures the TUN device, then execs the app
 
-### Shared entrypoint script (`deploy/docker/docker-entrypoint.sh`)
+### Shared entrypoint script (`docker/docker-entrypoint.sh`)
 Reads env vars `TUN_NAME`, `TUN_IP`, `PEER_IP`. Creates the TUN device with `ip tuntap add`,
 assigns the /30 IP, brings it up, adds a route to the peer, then `exec dotnet /app/PigeonPost.dll "$@"`.
 
@@ -194,15 +196,15 @@ to one must be mirrored in the other:
 
 | Script | Role | URL |
 |--------|------|-----|
-| `deploy/server/docker/deploy-docker.sh` | Server | `tcp\|0.0.0.0:9000/30` |
-| `deploy/server/docker/deploy-plain.sh` | Server | `tcp\|0.0.0.0:9000/30` |
-| `deploy/client/docker/deploy-docker.sh` | Client | `tcp\|203.0.113.10:9000/30` |
-| `deploy/client/docker/deploy-plain.sh` | Client | `tcp\|203.0.113.10:9000/30` |
+| `deploy/server/deploy-docker.sh` | Server | `tcp\|0.0.0.0:9000/30` |
+| `deploy/server/deploy-plain.sh` | Server | `tcp\|0.0.0.0:9000/30` |
+| `deploy/client/deploy-docker.sh` | Client | `tcp\|203.0.113.10:9000/30` |
+| `deploy/client/deploy-plain.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 
 ### Host setup scripts
-- **Server** (`deploy/server/docker/setup.sh`): Creates TUN, enables IP forwarding, NAT from tunnel
+- **Server** (`deploy/server/pre-deploy.sh`): Creates TUN, enables IP forwarding, NAT from tunnel
   subnet to WAN interface (`POSTROUTING -o $WAN_IF -s 10.0.0.0/30`).
-- **Client** (`deploy/client/docker/setup.sh`): Creates TUN, enables IP forwarding, NAT to tunnel
+- **Client** (`deploy/client/pre-deploy.sh`): Creates TUN, enables IP forwarding, NAT to tunnel
   (`POSTROUTING -o tun0`), marks LAN traffic with fwmark 1, sets up policy routing table 234.
 
 ## Pontifex Library (Summary)
