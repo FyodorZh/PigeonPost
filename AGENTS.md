@@ -23,15 +23,13 @@ PigeonPost.sln
 │   ├── PigeonPost.Tests/       NUnit — CLI parsing, debug mode E2E, reconnection
 │   ├── PigeonPost.Bridge.Tests/ NUnit — packet buffer, bridge, direct transport
 │   └── PigeonPost.Tun.Tests/   NUnit — TUN device contracts, constants, P/Invoke
-├── docker/
-│   ├── Dockerfile               Multi-stage build (SDK → runtime + iproute2)
-│   ├── docker-entrypoint.sh     Creates/configures TUN device, then execs app
-│   ├── client/                  docker-compose.yml + deploy.sh + host setup.sh
-│   ├── server/                  docker-compose.yml + deploy.sh + host setup.sh
-│   └── test/                    docker-compose.yml (server+client+iperf3 harness)
+├── deploy/
+│   ├── docker/                   Shared Dockerfile + docker-entrypoint.sh
+│   ├── client/docker/            docker-compose.yml + deploy.sh + setup.sh
+│   ├── server/docker/            docker-compose.yml + deploy.sh + setup.sh
+│   └── test/docker/              docker-compose.yml + iperf harness
 ├── Directory.Build.props        Global: net10.0, no implicit usings, nullable, warn-as-error
 ├── nuget.config                 Sources: local ./nugets + nuget.org
-├── description.md               Full technical design doc
 └── pontifex.md                  Pontifex transport library reference (1296 lines)
 ```
 
@@ -165,14 +163,15 @@ All custom packages are sourced from a **local NuGet feed** at `./nugets` in the
 (also configured as `/nugets` build context in Docker). The `nuget.config` lists both
 the local feed and nuget.org.
 
-## Docker Configuration
+## Deploy Configuration
 
-### Multi-stage Dockerfile (`docker/Dockerfile`)
+### Shared Dockerfile (`deploy/docker/Dockerfile`)
+All roles share the same multi-stage build:
 - **Build stage**: `dotnet/sdk:10.0` — copies local nugets, adds source, restores, publishes to `/app`
 - **Runtime stage**: `dotnet/runtime:10.0` — installs `iproute2`, copies app + entrypoint
 - Entrypoint: `docker-entrypoint.sh` which creates/configures the TUN device, then execs the app
 
-### Entrypoint script (`docker/docker-entrypoint.sh`)
+### Shared entrypoint script (`deploy/docker/docker-entrypoint.sh`)
 Reads env vars `TUN_NAME`, `TUN_IP`, `PEER_IP`. Creates the TUN device with `ip tuntap add`,
 assigns the /30 IP, brings it up, adds a route to the peer, then `exec dotnet /app/PigeonPost.dll "$@"`.
 
@@ -186,9 +185,9 @@ network namespace with a TUN device, and iperf3 sidecars attach via `network_mod
 TCP connect timeouts are 30 seconds (hardcoded in URLs).
 
 ### Host setup scripts
-- **Server** (`docker/server/setup.sh`): Creates TUN, enables IP forwarding, NAT from tunnel
+- **Server** (`deploy/server/docker/setup.sh`): Creates TUN, enables IP forwarding, NAT from tunnel
   subnet to WAN interface (`POSTROUTING -o $WAN_IF -s 10.0.0.0/30`).
-- **Client** (`docker/client/setup.sh`): Creates TUN, enables IP forwarding, NAT to tunnel
+- **Client** (`deploy/client/docker/setup.sh`): Creates TUN, enables IP forwarding, NAT to tunnel
   (`POSTROUTING -o tun0`), marks LAN traffic with fwmark 1, sets up policy routing table 234.
 - **Deploy** (`deploy.sh`): Exports `PIGEON_URL` env var, builds and starts the container.
   Server URL: `tcp|0.0.0.0:9000/30`, Client URL: `tcp|203.0.113.10:9000/30`.

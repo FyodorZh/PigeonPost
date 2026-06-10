@@ -1,12 +1,12 @@
 services:
   pigeonpost:
     build:
-      context: ../..
-      dockerfile: docker/Dockerfile
+      context: ../../..
+      dockerfile: deploy/docker/Dockerfile
       additional_contexts:
         - nugets=/Users/fyodor/Development/nugets
     image: pigeonpost:latest
-    container_name: pigeonpost-client
+    container_name: pigeonpost-server
     network_mode: host
     cap_add:
       - NET_ADMIN
@@ -14,7 +14,7 @@ services:
       - /dev/net/tun
     environment:
       TUN_NAME: tun0
-      TUN_IP: 10.0.0.2
-      PEER_IP: 10.0.0.1
-    command: --role client --tun tun0 --url ${PIGEON_URL:?Set PIGEON_URL}
+      TUN_IP: 10.0.0.1
+      PEER_IP: 10.0.0.2
+    command: --role server --tun tun0 --url ${PIGEON_URL:?Set PIGEON_URL}
     restart: unless-stopped
