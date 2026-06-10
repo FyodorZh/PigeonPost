@@ -51,6 +51,7 @@ fi
 
 # --- Policy routing table ---
 TABLE_ID=234
+mkdir -p /etc/iproute2
 if ! grep -qxF "$TABLE_ID tunnel" /etc/iproute2/rt_tables 2>/dev/null; then
     echo "Adding table $TABLE_ID to /etc/iproute2/rt_tables"
     echo "$TABLE_ID tunnel" >> /etc/iproute2/rt_tables
