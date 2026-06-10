@@ -25,8 +25,8 @@ PigeonPost.sln
 │   └── PigeonPost.Tun.Tests/   NUnit — TUN device contracts, constants, P/Invoke
 ├── deploy/
 │   ├── docker/                   Shared Dockerfile + docker-entrypoint.sh
-│   ├── client/docker/            docker-compose.yml + deploy.sh + setup.sh
-│   ├── server/docker/            docker-compose.yml + deploy.sh + setup.sh
+│   ├── client/docker/            docker-compose.yml + deploy-docker.sh + deploy-plain.sh + setup.sh
+│   ├── server/docker/            docker-compose.yml + deploy-docker.sh + deploy-plain.sh + setup.sh
 │   └── test/docker/              docker-compose.yml + iperf harness
 ├── Directory.Build.props        Global: net10.0, no implicit usings, nullable, warn-as-error
 ├── nuget.config                 Sources: local ./nugets + nuget.org
@@ -184,13 +184,26 @@ The test `docker-compose.yml` uses a `pigeon-net` bridge network. Each container
 network namespace with a TUN device, and iperf3 sidecars attach via `network_mode: "service:..."`.
 TCP connect timeouts are 30 seconds (hardcoded in URLs).
 
+### Deployment scripts
+
+Two deployment methods are provided per role, **guaranteed equivalent** — any future changes
+to one must be mirrored in the other:
+
+- **`deploy-docker.sh`** — builds a Docker image and runs the app in a container (host networking + NET_ADMIN).
+- **`deploy-plain.sh`** — publishes the app directly and runs it on the host (requires root for TUN setup).
+
+| Script | Role | URL |
+|--------|------|-----|
+| `deploy/server/docker/deploy-docker.sh` | Server | `tcp\|0.0.0.0:9000/30` |
+| `deploy/server/docker/deploy-plain.sh` | Server | `tcp\|0.0.0.0:9000/30` |
+| `deploy/client/docker/deploy-docker.sh` | Client | `tcp\|203.0.113.10:9000/30` |
+| `deploy/client/docker/deploy-plain.sh` | Client | `tcp\|203.0.113.10:9000/30` |
+
 ### Host setup scripts
 - **Server** (`deploy/server/docker/setup.sh`): Creates TUN, enables IP forwarding, NAT from tunnel
   subnet to WAN interface (`POSTROUTING -o $WAN_IF -s 10.0.0.0/30`).
 - **Client** (`deploy/client/docker/setup.sh`): Creates TUN, enables IP forwarding, NAT to tunnel
   (`POSTROUTING -o tun0`), marks LAN traffic with fwmark 1, sets up policy routing table 234.
-- **Deploy** (`deploy.sh`): Exports `PIGEON_URL` env var, builds and starts the container.
-  Server URL: `tcp|0.0.0.0:9000/30`, Client URL: `tcp|203.0.113.10:9000/30`.
 
 ## Pontifex Library (Summary)
 
