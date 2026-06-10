@@ -10,6 +10,8 @@ set -euo pipefail
 WAN_IF="${1:-eth0}"
 TUN="tun0"
 TUN_NET="10.0.0.0/30"
+TUN_IP="10.0.0.1"
+PEER_TUN_IP="10.0.0.2"
 
 echo "=== PigeonPost server setup ==="
 
@@ -17,6 +19,19 @@ echo "=== PigeonPost server setup ==="
 if ! ip link show "$TUN" >/dev/null 2>&1; then
     echo "Creating TUN device: $TUN"
     ip tuntap add dev "$TUN" mode tun
+fi
+
+if ! ip addr show dev "$TUN" | grep -qF "$TUN_IP"; then
+    echo "Assigning $TUN_IP/30 to $TUN"
+    ip addr add "$TUN_IP/30" dev "$TUN"
+fi
+
+echo "Bringing $TUN up"
+ip link set "$TUN" up
+
+if ! ip route show dev "$TUN" | grep -qF "$PEER_TUN_IP"; then
+    echo "Adding route to peer $PEER_TUN_IP via $TUN"
+    ip route add "$PEER_TUN_IP/32" dev "$TUN"
 fi
 
 # --- IP forwarding ---
