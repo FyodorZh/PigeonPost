@@ -4,7 +4,7 @@ services:
       context: ../../..
       dockerfile: docker/Dockerfile
       additional_contexts:
-        - nugets=/Users/fyodor/Development/nugets
+        - nugets=../../../nugets
     image: pigeonpost:latest
     container_name: pigeonpost-server
     hostname: pigeonpost-server
@@ -25,7 +25,7 @@ services:
       context: ../../..
       dockerfile: docker/Dockerfile
       additional_contexts:
-        - nugets=/Users/fyodor/Development/nugets
+        - nugets=../../../nugets
     image: pigeonpost:latest
     container_name: pigeonpost-client
     hostname: pigeonpost-client

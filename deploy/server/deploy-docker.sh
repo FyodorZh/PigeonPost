@@ -10,5 +10,5 @@ docker compose -f docker/docker-compose.yml build
 docker compose -f docker/docker-compose.yml up -d
 
 echo "Server deployed."
-echo "  url: $PIGEON_URL"
+echo "  url: '$PIGEON_URL'"
 echo "  logs: docker logs pigeonpost-server -f"
