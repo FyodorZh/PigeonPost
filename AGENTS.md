@@ -151,19 +151,49 @@ PigeonPost --role debug --tun tun0 --tun tun1 --url 'direct|ep_debug'
 
 ## NuGet Dependencies
 
-| Package | Purpose |
-|---------|---------|
-| `Pontifex` (0.1.2-dev.0) | Core transport abstractions, data types, FSM |
-| `Pontifex.Transport.Tcp` (0.1.1-dev.0) | TCP network transport |
-| `Pontifex.Transport.Direct` (0.1.1-dev.0) | In-process zero-copy transport |
-| `Scriba` | Structured logging |
-| `Scriba.JsonFactory` | JSON log formatting |
-| `Actuarius` | Memory pooling (transitive) |
-| `Operarius` | Scheduling (transitive) |
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `Pontifex` | 0.1.2-dev.0 | Core transport abstractions, data types, FSM |
+| `Pontifex.Transport.Tcp` | 0.1.1-dev.0 | TCP network transport |
+| `Pontifex.Transport.Direct` | 0.1.1-dev.0 | In-process zero-copy transport |
+| `Scriba` | 0.2.3-dev.0 | Structured logging |
+| `Scriba.JsonFactory` | 0.2.1-dev.0 | JSON log formatting |
+| `Actuarius.Memory` | 0.1.3-dev.0 | Memory pooling (transitive) |
+| `Actuarius.Collections` | 0.1.3-dev.0 | Collections (transitive) |
+| `Actuarius.Concurrent` | 0.1.4-dev.0 | Concurrency primitives (transitive) |
+| `Operarius` | 0.2.2-dev.0 | Scheduling (transitive) |
+| `System.Reactive` | 6.1.0 | Reactive extensions (transitive) |
+| `NUnit` | 4.2.2 | Test framework |
+| `NUnit3TestAdapter` | 4.6.0 | Test adapter |
+| `Microsoft.NET.Test.Sdk` | 17.12.0 | Test SDK |
+| `Microsoft.CodeCoverage` | 17.12.0 | Code coverage (transitive) |
+| `Microsoft.TestPlatform.ObjectModel` | 17.12.0 | Test platform (transitive) |
+| `Microsoft.TestPlatform.TestHost` | 17.12.0 | Test host (transitive) |
+| `Newtonsoft.Json` | 13.0.1 | JSON (transitive) |
 
-All custom packages are sourced from a **local NuGet feed** at `./nugets` in the repo
-(also configured as `/nugets` build context in Docker). The `nuget.config` lists both
-the local feed and nuget.org.
+All packages (including transitive dependencies from nuget.org) are bundled in the
+**local NuGet feed** at `./nugets`. This enables fully offline builds and Docker builds
+without internet access. The `nuget.config` lists both the local feed and nuget.org.
+
+**Important:** Whenever a package reference in any `.csproj` file is added, removed, or
+version-bumped, the local `./nugets/` directory must be updated to match. Run the
+following to refresh it:
+
+```bash
+# 1. Download all packages (including transitive) to a temp directory
+dotnet restore --packages /tmp/nuget-fresh
+
+# 2. Copy the .nupkg files to the local feed
+find /tmp/nuget-fresh -name '*.nupkg' -exec cp {} ./nugets/ \;
+
+# 3. Verify the solution restores offline
+dotnet nuget locals all --clear
+dotnet restore --packages /tmp/nuget-verify
+
+# 4. Commit the updated ./nugets/ directory
+```
+The local feed must always contain every package the solution needs — no missing
+transitive dependencies allowed.
 
 ## Deploy Configuration
 
