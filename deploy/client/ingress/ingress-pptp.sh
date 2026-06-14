@@ -95,13 +95,13 @@ done
 # ---------- Firewall ----------
 echo "Opening PPTP firewall ports (inserting at top of INPUT chain)"
 
-if ! iptables -C INPUT -p gre -j ACCEPT 2>/dev/null; then
-    iptables -I INPUT 1 -p gre -j ACCEPT
-fi
+# Remove existing rules first (they may be at the bottom from a previous -A)
+iptables -D INPUT -p gre -j ACCEPT 2>/dev/null || true
+iptables -D INPUT -p tcp --dport 1723 -j ACCEPT 2>/dev/null || true
 
-if ! iptables -C INPUT -p tcp --dport 1723 -j ACCEPT 2>/dev/null; then
-    iptables -I INPUT 1 -p tcp --dport 1723 -j ACCEPT
-fi
+# Insert at the top for reliable matching before any restrictive rules
+iptables -I INPUT 1 -p gre -j ACCEPT
+iptables -I INPUT 1 -p tcp --dport 1723 -j ACCEPT
 
 echo ""
 echo "NOTE: If this machine is behind NAT, ensure your router:"
