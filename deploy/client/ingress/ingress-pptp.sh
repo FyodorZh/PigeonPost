@@ -28,7 +28,7 @@ fi
 
 POOL_BASE="${BASH_REMATCH[1]}"
 PPTP_LOCAL_IP="${POOL_BASE}.1"
-PPTP_REMOTE_RANGE="${POOL_BASE}.100-${POOL_BASE}.200"
+PPTP_REMOTE_RANGE="${POOL_BASE}.100-200"
 
 if [ "$PPTP_PASSWORD" = "pigeonpass" ]; then
     echo "WARNING: using default PPTP password. Set PPTP_PASSWORD to change it."
