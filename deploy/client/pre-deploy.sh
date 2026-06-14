@@ -55,8 +55,8 @@ else
 fi
 
 # --- Mark traffic from LAN ---
-MARK_RULE="-t mangle -A PREROUTING -i $LAN_IF -j MARK --set-mark 1"
-if ! iptables -t mangle -C PREROUTING -i "$LAN_IF" -j MARK --set-mark 1 2>/dev/null; then
+MARK_RULE="-t mangle -A PREROUTING -i $LAN_IF -s $LOCAL_NET -j MARK --set-mark 1"
+if ! iptables -t mangle -C PREROUTING -i "$LAN_IF" -s "$LOCAL_NET" -j MARK --set-mark 1 2>/dev/null; then
     echo "Adding mangle rule: $MARK_RULE"
     iptables $MARK_RULE
 else
