@@ -77,6 +77,23 @@ else
     echo "NAT rule already exists"
 fi
 
+# --- FORWARD: allow tunnel traffic through ---
+RULE_FWD_OUT="-A FORWARD -i $TUN -o $WAN_IF -s $TUN_NET -j ACCEPT"
+if ! iptables -C FORWARD -i "$TUN" -o "$WAN_IF" -s "$TUN_NET" -j ACCEPT 2>/dev/null; then
+    echo "Adding FORWARD rule: $RULE_FWD_OUT"
+    iptables $RULE_FWD_OUT
+else
+    echo "FORWARD outbound rule already exists"
+fi
+
+RULE_FWD_IN="-A FORWARD -i $WAN_IF -o $TUN -m state --state RELATED,ESTABLISHED -j ACCEPT"
+if ! iptables -C FORWARD -i "$WAN_IF" -o "$TUN" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
+    echo "Adding FORWARD rule: $RULE_FWD_IN"
+    iptables $RULE_FWD_IN
+else
+    echo "FORWARD inbound rule already exists"
+fi
+
 echo ""
 echo "Setup complete."
 echo "Note: sysctl and iptables changes are not persistent across reboots."
