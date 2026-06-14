@@ -3,11 +3,10 @@
 # One-time host setup for the PigeonPost client machine.
 # Run this once per boot (or integrate into /etc/rc.local / systemd).
 #
-# Usage: ./setup.sh [lan_interface]
+# Usage: ./setup.sh
 #
 set -euo pipefail
 
-LAN_IF="${1:-eth0}"
 TUN="tun0"
 TUN_IP="10.0.0.2"
 PEER_TUN_IP="10.0.0.1"

@@ -3,11 +3,41 @@
 # One-time host setup for the PigeonPost server machine.
 # Run this once per boot (or integrate into /etc/rc.local / systemd).
 #
-# Usage: ./setup.sh [wan_interface]
+# Usage: ./setup.sh <wan_interface>
 #
 set -euo pipefail
 
-WAN_IF="${1:-eth0}"
+WAN_IF="${1:-}"
+ALL_IFS=$(ip -br link show | awk '{print $1}')
+
+if [ -z "$WAN_IF" ]; then
+    echo "ERROR: no interface specified."
+    has_error=1
+elif ! echo "$ALL_IFS" | grep -qxF "$WAN_IF"; then
+    echo "ERROR: interface '$WAN_IF' not found."
+    has_error=1
+fi
+
+if [ -n "${has_error:-}" ]; then
+    DEFAULT_IF=$(ip -4 route show default 2>/dev/null | awk '{print $5}' || true)
+
+    echo ""
+    echo "Available interfaces:"
+
+    while IFS= read -r iface; do
+        if [ -n "$DEFAULT_IF" ] && [ "$iface" = "$DEFAULT_IF" ]; then
+            echo "  $iface  ← (best guess: default route)"
+        else
+            echo "  $iface"
+        fi
+    done <<< "$ALL_IFS"
+
+    echo ""
+    echo "Choose the interface connected to your WAN (internet) and re-run:"
+    echo "  $(basename "$0") <interface>"
+    exit 1
+fi
+
 TUN="tun0"
 TUN_NET="10.0.0.0/30"
 TUN_IP="10.0.0.1"
