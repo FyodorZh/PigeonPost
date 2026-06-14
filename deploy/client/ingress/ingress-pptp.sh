@@ -57,6 +57,12 @@ logwtmp
 localip $PPTP_LOCAL_IP
 remoteip $PPTP_REMOTE_RANGE
 EOF
+else
+    # Fix old buggy format (full IP range "a.b.c.X-a.b.c.Y" -> "a.b.c.X-Y")
+    if grep -qE '^remoteip\s+[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' /etc/pptpd.conf 2>/dev/null; then
+        echo "Fixing remoteip format in /etc/pptpd.conf"
+        sed -i -E 's/^(remoteip\s+[0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)-[0-9]+\.[0-9]+\.[0-9]+\.([0-9]+)$/\1.\2-\3/' /etc/pptpd.conf
+    fi
 fi
 
 # ---------- /etc/ppp/pptpd-options ----------
