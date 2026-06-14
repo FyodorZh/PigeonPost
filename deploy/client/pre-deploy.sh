@@ -65,6 +65,23 @@ else
     echo "Mangle rule already exists"
 fi
 
+# --- FORWARD: allow traffic through the tunnel ---
+FORWARD_TUN_IN="-A FORWARD -o $TUN -j ACCEPT"
+if ! iptables -C FORWARD -o "$TUN" -j ACCEPT 2>/dev/null; then
+    echo "Adding FORWARD rule: $FORWARD_TUN_IN"
+    iptables $FORWARD_TUN_IN
+else
+    echo "FORWARD outbound rule already exists"
+fi
+
+FORWARD_TUN_OUT="-A FORWARD -i $TUN -m state --state RELATED,ESTABLISHED -j ACCEPT"
+if ! iptables -C FORWARD -i "$TUN" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
+    echo "Adding FORWARD rule: $FORWARD_TUN_OUT"
+    iptables $FORWARD_TUN_OUT
+else
+    echo "FORWARD inbound rule already exists"
+fi
+
 # --- Policy routing table ---
 TABLE_ID=234
 mkdir -p /etc/iproute2
