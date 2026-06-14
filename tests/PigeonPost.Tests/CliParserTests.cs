@@ -36,10 +36,12 @@ public class CliParserTests
     }
 
     [Test]
-    public void Debug_Role_WithOneTun_Fails()
+    public void Debug_Role_WithOneTun_DefaultsSecond()
     {
         var cfg = CliParser.Parse(new[] { "-r", "debug", "-t", "tunA", "-u", "direct|ep" }, TextWriter.Null);
-        Assert.That(cfg, Is.Null);
+        Assert.That(cfg, Is.Not.Null);
+        Assert.That(cfg!.Role, Is.EqualTo(Role.Debug));
+        Assert.That(cfg!.TunNames, Is.EquivalentTo(new[] { "tunA", "tunB" }));
     }
 
     [Test]

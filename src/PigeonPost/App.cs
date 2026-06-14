@@ -128,20 +128,21 @@ internal sealed class App
             ackClient.Init(handler);
 
             var stopped = new TaskCompletionSource<StopReason>();
-            bridge.OnStopped += reason => stopped.TrySetResult(reason);
+            Action<StopReason> onBridgeStopped = reason => stopped.TrySetResult(reason);
+            bridge.OnStopped += onBridgeStopped;
 
             ackClient.Start(reason =>
             {
-                _logger.i($"Client stopped: {reason.Type}");
+                _logger.i($"Transport stopped: {reason.Type}");
                 stopped.TrySetResult(reason);
             });
-
-            _logger.i("Client connected.");
 
             var result = await Task.WhenAny(
                 stopped.Task,
                 WaitForShutdownAsync()
             );
+
+            bridge.OnStopped -= onBridgeStopped;
 
             if (_shutdownRequested)
             {
@@ -150,7 +151,14 @@ internal sealed class App
             }
 
             _logger.i("Connection lost. Reconnecting in 1 second...");
-            await Task.Delay(1000, _cts.Token);
+            try
+            {
+                await Task.Delay(1000, _cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
         }
 
         bridge.Stop(Pontifex.StopReason.UserIntention);
