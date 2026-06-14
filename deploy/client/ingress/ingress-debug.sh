@@ -44,7 +44,10 @@ VETH_PEER="veth1"
 
 # --- 1. Create network namespace ---
 
-if ip netns list 2>/dev/null | grep -qxF "$NS"; then
+NS_BIND="/run/netns/$NS"
+if [ -f "$NS_BIND" ]; then
+    echo "Network namespace '$NS' already exists. Skipping creation."
+elif ip netns list 2>/dev/null | grep -qxF "$NS"; then
     echo "Network namespace '$NS' already exists. Skipping creation."
 else
     echo "Creating network namespace: $NS"
