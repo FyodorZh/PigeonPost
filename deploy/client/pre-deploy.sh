@@ -14,6 +14,17 @@ PEER_TUN_IP="10.0.0.1"
 
 echo "=== PigeonPost client setup ==="
 
+# --- ipset for ingress traffic routing ---
+if ! command -v ipset >/dev/null 2>&1; then
+    echo "Installing ipset"
+    apt-get update -qq && apt-get install -y -qq ipset
+fi
+
+if ! ipset list pp-ingress >/dev/null 2>&1; then
+    echo "Creating ipset: pp-ingress"
+    ipset create pp-ingress hash:net
+fi
+
 # --- TUN device ---
 if ! ip link show "$TUN" >/dev/null 2>&1; then
     echo "Creating TUN device: $TUN"
@@ -37,15 +48,7 @@ fi
 echo "Enabling IP forwarding"
 sysctl -w net.ipv4.ip_forward=1
 
-# --- Detect local subnet ---
-LOCAL_NET=$(ip -4 addr show dev "$LAN_IF" | awk '/inet / {print $2}')
-if [ -z "$LOCAL_NET" ]; then
-    echo "ERROR: cannot detect subnet on $LAN_IF"
-    exit 1
-fi
-echo "Detected local subnet: $LOCAL_NET on $LAN_IF"
-
-# --- NAT: local subnet -> tunnel ---
+# --- NAT: tunnel -> internet ---
 RULE="-t nat -A POSTROUTING -o $TUN -j MASQUERADE"
 if ! iptables -t nat -C POSTROUTING -o "$TUN" -j MASQUERADE 2>/dev/null; then
     echo "Adding NAT rule: $RULE"
@@ -54,9 +57,9 @@ else
     echo "NAT rule already exists"
 fi
 
-# --- Mark traffic from LAN ---
-MARK_RULE="-t mangle -A PREROUTING -i $LAN_IF -s $LOCAL_NET -j MARK --set-mark 1"
-if ! iptables -t mangle -C PREROUTING -i "$LAN_IF" -s "$LOCAL_NET" -j MARK --set-mark 1 2>/dev/null; then
+# --- Mark traffic from registered ingress sources ---
+MARK_RULE="-t mangle -A PREROUTING -m set --match-set pp-ingress src -j MARK --set-mark 1"
+if ! iptables -t mangle -C PREROUTING -m set --match-set pp-ingress src -j MARK --set-mark 1 2>/dev/null; then
     echo "Adding mangle rule: $MARK_RULE"
     iptables $MARK_RULE
 else

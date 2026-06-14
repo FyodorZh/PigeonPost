@@ -231,11 +231,37 @@ to one must be mirrored in the other:
 | `deploy/client/deploy-docker.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 | `deploy/client/deploy-plain.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 
+### Idempotency Requirements
+
+All deployment and setup scripts must be **fully idempotent** — running them multiple
+times must produce the same state as running them once, with no errors and no duplicate
+rules or entries.
+
+**`pre-deploy.sh` scripts** — TUN creation, IP assignment, routing, NAT, ipset setup,
+policy routing. Every operation must check existence before acting.
+
+**`deploy-*.sh` scripts** — Docker build/up or `dotnet publish` + TUN setup. Rebuild is
+acceptable; TUN setup must be guarded; container/service start must handle already-running
+state.
+
+**Ingress scripts** (`deploy/client/ingress/`) — Register traffic sources into the
+`pp-ingress` ipset. Adding an already-registered entry must be a no-op (`-exist` flag).
+
+Every change to any of these scripts must be verified for idempotency: run the script
+twice and confirm the second run produces zero errors and no duplicate rules or entries.
+
 ### Host setup scripts
+
 - **Server** (`deploy/server/pre-deploy.sh`): Creates TUN, enables IP forwarding, NAT from tunnel
   subnet to WAN interface (`POSTROUTING -o $WAN_IF -s 10.0.0.0/30`).
 - **Client** (`deploy/client/pre-deploy.sh`): Creates TUN, enables IP forwarding, NAT to tunnel
-  (`POSTROUTING -o tun0`), marks LAN traffic with fwmark 1, sets up policy routing table 234.
+  (`POSTROUTING -o tun0`), sets up ipset `pp-ingress` + mangle rule referencing it, sets up policy
+  routing table 234.
+
+### Ingress scripts (`deploy/client/ingress/`)
+Ingress scripts register traffic sources (e.g. LAN subnet, PPTP pool, WireGuard peers) into the
+`pp-ingress` ipset. Packets with source IP matching an entry in this set get marked with fwmark 1
+and routed through the PigeonPost tunnel.
 
 ## Pontifex Library (Summary)
 
