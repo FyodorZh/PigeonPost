@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using Scriba;
 using Scriba.Consumers;
@@ -8,6 +9,29 @@ namespace PigeonPost;
 internal static class Program
 {
     private static App? _app;
+    
+    public class ConsoleConsumer2 : MultiRefLogConsumer
+    {
+        public ILogFormatter Formatter { get; set; } = new SynchronizedLogFormatter(DefaultFormatter);
+        
+        public override void Message(MessageData logMessage)
+        {
+            Formatter.Format(logMessage, Console.Out);
+        }
+        
+        private static void DefaultFormatter(MessageData logMessage, TextWriter dst)
+        {
+            dst.Write(logMessage.Severity);
+            dst.Write(": ");
+            if (logMessage.WriteTimeTo(dst))
+            {
+                dst.Write(": ");
+            }
+            logMessage.WriteMessageTo(dst);
+            logMessage.WriteStackTrace("\t", dst);
+            dst.WriteLine();
+        }
+    }
 
     static int Main(string[] args)
     {
@@ -15,7 +39,8 @@ internal static class Program
         if (config == null)
             return 1;
 
-        StaticLogger.Instance.AddConsumer(new ConsoleConsumer());
+        StaticLogger.Instance.AddConsumer(new ConsoleConsumer2());
+        StaticLogger.Instance.LogTime = true;
         var logger = StaticLogger.Instance;
 
         _app = new App(config, logger);
