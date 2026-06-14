@@ -87,16 +87,29 @@ if ! grep -qF "$PPTP_USER pptpd" /etc/ppp/chap-secrets 2>/dev/null; then
     echo "$PPTP_USER pptpd $PPTP_PASSWORD *" >> /etc/ppp/chap-secrets
 fi
 
+# ---------- Kernel modules for PPTP NAT support ----------
+for mod in nf_conntrack_pptp nf_nat_pptp; do
+    modprobe -q "$mod" 2>/dev/null || true
+done
+
 # ---------- Firewall ----------
-echo "Opening PPTP firewall ports"
+echo "Opening PPTP firewall ports (inserting at top of INPUT chain)"
 
 if ! iptables -C INPUT -p gre -j ACCEPT 2>/dev/null; then
-    iptables -A INPUT -p gre -j ACCEPT
+    iptables -I INPUT 1 -p gre -j ACCEPT
 fi
 
 if ! iptables -C INPUT -p tcp --dport 1723 -j ACCEPT 2>/dev/null; then
-    iptables -A INPUT -p tcp --dport 1723 -j ACCEPT
+    iptables -I INPUT 1 -p tcp --dport 1723 -j ACCEPT
 fi
+
+echo ""
+echo "NOTE: If this machine is behind NAT, ensure your router:"
+echo "  1. Forwards TCP 1723 -> $(hostname -I | awk '{print $1}')"
+echo "  2. Forwards GRE (proto 47) -> $(hostname -I | awk '{print $1}')"
+echo "     (or enable 'PPTP passthrough' / 'GRE passthrough' on the router)"
+echo "  3. DISABLES 'PPTP ALG' if present (breaks PPTP through NAT)"
+echo ""
 
 # ---------- IP forwarding ----------
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
