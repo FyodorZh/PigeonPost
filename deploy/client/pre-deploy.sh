@@ -73,18 +73,18 @@ if ! grep -qxF "$TABLE_ID tunnel" /etc/iproute2/rt_tables 2>/dev/null; then
     echo "$TABLE_ID tunnel" >> /etc/iproute2/rt_tables
 fi
 
-if ! ip rule show 2>/dev/null | grep -q "lookup $TABLE_ID"; then
-    echo "Adding policy rule for fwmark 1 -> table $TABLE_ID"
-    ip rule add fwmark 1 table $TABLE_ID
-else
-    echo "Policy rule already exists"
-fi
-
 if ! ip route show table $TABLE_ID | grep -q "$TUN"; then
     echo "Adding default route via $PEER_TUN_IP dev $TUN to table $TABLE_ID"
     ip route add default via "$PEER_TUN_IP" dev "$TUN" table $TABLE_ID
 else
     echo "Route already exists"
+fi
+
+if ! ip rule show 2>/dev/null | grep -q "lookup $TABLE_ID"; then
+    echo "Adding policy rule for fwmark 1 -> table $TABLE_ID"
+    ip rule add fwmark 1 table $TABLE_ID
+else
+    echo "Policy rule already exists"
 fi
 
 echo ""
