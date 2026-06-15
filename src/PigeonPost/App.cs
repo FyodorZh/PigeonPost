@@ -12,6 +12,7 @@ using Pontifex.Transports.Direct;
 using Pontifex.Transports.Tcp;
 using PigeonPost.Bridge;
 using PigeonPost.Bridge.Handlers;
+using PigeonPost.Bridge.Server;
 using PigeonPost.Tun;
 using Scriba;
 using BridgeClass = PigeonPost.Bridge.Bridge;
@@ -63,15 +64,17 @@ internal sealed class App
         tun.SetSendBufferSize(1048576);
         _logger.i($"TUN device '{tunName}' opened.");
 
+        var serverHub = new ServerHub(_logger, tun);
         var buffer = new PacketBuffer(_config.BufferSizeBytes);
 
         using var bridge = new BridgeClass(tun, buffer, _logger, _config.Verbose);
+        bridge.SetPacketHandler(packet => serverHub.OnPacketFromTun(packet));
 
         var transport = CreateTransport(_config.PontifexUrl, isServer: true);
         if (transport is not IAckRawServer ackServer)
             throw new InvalidOperationException("Transport is not an IAckRawServer.");
 
-        ackServer.Init(new BridgeServerAcknowledger(bridge));
+        ackServer.Init(new BridgeServerAcknowledger(serverHub));
 
         bridge.Start();
 
@@ -96,6 +99,8 @@ internal sealed class App
             _logger.w("Transport stopped unexpectedly. Exiting.");
         }
 
+        serverHub.StopAccepting();
+        serverHub.StopAll(Pontifex.StopReason.UserIntention);
         bridge.Stop(Pontifex.StopReason.UserIntention);
         ackServer.Stop(Pontifex.StopReason.UserIntention);
         tun.Close();
@@ -179,15 +184,18 @@ internal sealed class App
         tun2.SetSendBufferSize(1048576);
         _logger.i($"TUN devices '{tunName1}' and '{tunName2}' opened.");
 
+        var serverHub = new ServerHub(_logger, tun1);
         var buffer1 = new PacketBuffer(_config.BufferSizeBytes);
         var buffer2 = new PacketBuffer(_config.BufferSizeBytes);
         using var bridge1 = new BridgeClass(tun1, buffer1, _logger, _config.Verbose);
         using var bridge2 = new BridgeClass(tun2, buffer2, _logger, _config.Verbose);
 
+        bridge1.SetPacketHandler(packet => serverHub.OnPacketFromTun(packet));
+
         var serverNameActual = ExtractDirectServerName(_config.PontifexUrl);
 
         var server = new AckRawDirectServer(serverNameActual, _logger, MemoryRental.Shared);
-        server.Init(new BridgeServerAcknowledger(bridge1));
+        server.Init(new BridgeServerAcknowledger(serverHub));
 
         var client = new AckRawDirectClient(serverNameActual, _logger, MemoryRental.Shared);
         client.Init(new BridgeClientHandler(bridge2));
@@ -204,6 +212,8 @@ internal sealed class App
 
         client.Stop(Pontifex.StopReason.UserIntention);
         bridge2.Stop(Pontifex.StopReason.UserIntention);
+        serverHub.StopAccepting();
+        serverHub.StopAll(Pontifex.StopReason.UserIntention);
         bridge1.Stop(Pontifex.StopReason.UserIntention);
         tun2.Close();
         tun1.Close();

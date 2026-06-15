@@ -7,6 +7,8 @@ using Pontifex;
 using Pontifex.Transports.Direct;
 using PigeonPost.Bridge;
 using PigeonPost.Bridge.Handlers;
+using PigeonPost.Bridge.Protocol;
+using PigeonPost.Bridge.Server;
 using PigeonPost.Tun;
 using Scriba;
 using Scriba.Consumers;
@@ -28,6 +30,7 @@ public class DebugModeEndToEndTests
     private TunDevice _tunB = null!;
     private BridgeClass _bridgeA = null!;
     private BridgeClass _bridgeB = null!;
+    private ServerHub _serverHub = null!;
 
     [SetUp]
     public void SetUp()
@@ -47,11 +50,14 @@ public class DebugModeEndToEndTests
         _bridgeA = new BridgeClass(_tunA, bufferA, StaticLogger.Instance, verbose: true);
         _bridgeB = new BridgeClass(_tunB, bufferB, StaticLogger.Instance, verbose: true);
 
+        _serverHub = new ServerHub(StaticLogger.Instance, _tunA);
+        _bridgeA.SetPacketHandler(packet => _serverHub.OnPacketFromTun(packet));
+
         _server = new AckRawDirectServer(DirectServerName, StaticLogger.Instance, MemoryRental.Shared);
-        _server.Init(new BridgeServerAcknowledger(_bridgeA));
+        _server.Init(new BridgeServerAcknowledger(_serverHub));
 
         _client = new AckRawDirectClient(DirectServerName, StaticLogger.Instance, MemoryRental.Shared);
-        _client.Init(new BridgeClientHandler(_bridgeB));
+        _client.Init(new BridgeClientHandler(_bridgeB, new ClientHandshake(new ClientId("debug-client"), 0x0A630001)));
 
         _bridgeA.Start();
         _bridgeB.Start();

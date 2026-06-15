@@ -22,6 +22,7 @@ public sealed class Bridge : IBridge, IDisposable
     private Thread? _tunReaderThread;
     private IAckRawBaseEndpoint? _endpoint;
     private readonly object _endpointLock = new();
+    private Action<byte[]>? _packetHandler;
 
     private long _packetsIn;
     private long _packetsOut;
@@ -36,6 +37,11 @@ public sealed class Bridge : IBridge, IDisposable
         _buffer = buffer ?? throw new ArgumentNullException(nameof(buffer));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _verbose = verbose;
+    }
+
+    public void SetPacketHandler(Action<byte[]>? handler)
+    {
+        _packetHandler = handler;
     }
 
     public void Start()
@@ -82,7 +88,12 @@ public sealed class Bridge : IBridge, IDisposable
                 if (_verbose)
                     _logger.i($"TUN ← {bytesRead} bytes (#{_packetsIn})");
 
-                if (TryGetEndpoint(out var endpoint))
+                var handler = _packetHandler;
+                if (handler != null)
+                {
+                    handler(packet);
+                }
+                else if (TryGetEndpoint(out var endpoint))
                 {
                     SendPacket(endpoint, packet);
                 }
