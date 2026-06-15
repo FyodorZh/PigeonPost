@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+.git/
+.vscode/
+.idea/
+*.user
+*.suo
+nugets/
+tests/
+deploy/
+actions/
+*.md
