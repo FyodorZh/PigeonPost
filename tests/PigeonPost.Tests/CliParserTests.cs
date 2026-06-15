@@ -22,9 +22,10 @@ public class CliParserTests
     [Test]
     public void MinimalValidArgs_Client_ParsesCorrectly()
     {
-        var cfg = Parse("--role", "client", "-t", "tun1", "-u", "direct|ep1");
+        var cfg = Parse("--role", "client", "--client-id", "c1", "-t", "tun1", "-u", "direct|ep1");
         Assert.That(cfg.Role, Is.EqualTo(Role.Client));
         Assert.That(cfg.TunNames[0], Is.EqualTo("tun1"));
+        Assert.That(cfg.ClientId, Is.EqualTo("c1"));
     }
 
     [Test]
@@ -56,18 +57,18 @@ public class CliParserTests
     [Test]
     public void BufferSizeCustom_Parses()
     {
-        var cfg = Parse("-r", "client", "-t", "t0", "-u", "url", "-b", "50000");
+        var cfg = Parse("-r", "client", "--client-id", "c1", "-t", "t0", "-u", "url", "-b", "50000");
         Assert.That(cfg.BufferSizeBytes, Is.EqualTo(50_000));
     }
 
     [Test]
     public void BufferSizeBelowMinimum_Fails()
-        => Assert.That(ParseOrNull("-r", "client", "-t", "t0", "-u", "url", "-b", "100"), Is.Null);
+        => Assert.That(ParseOrNull("-r", "server", "-t", "t0", "-u", "url", "-b", "100"), Is.Null);
 
     [Test]
     public void VerboseFlag_SetsTrue()
     {
-        var cfg = Parse("-r", "client", "-t", "t0", "-u", "url", "-v");
+        var cfg = Parse("-r", "server", "-t", "t0", "-u", "url", "-v");
         Assert.That(cfg.Verbose, Is.True);
     }
 

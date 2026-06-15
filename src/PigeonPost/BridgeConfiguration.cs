@@ -10,4 +10,6 @@ public sealed class BridgeConfiguration
     public string PontifexUrl { get; init; } = string.Empty;
     public int BufferSizeBytes { get; init; } = 10 * 1024 * 1024;
     public bool Verbose { get; init; }
+    public string? ClientId { get; init; }
+    public int DebugClientCount { get; init; } = 1;
 }

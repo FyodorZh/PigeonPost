@@ -1,5 +1,5 @@
 using System;
-using System.Net;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Actuarius.Memory;
@@ -12,6 +12,7 @@ using Pontifex.Transports.Direct;
 using Pontifex.Transports.Tcp;
 using PigeonPost.Bridge;
 using PigeonPost.Bridge.Handlers;
+using PigeonPost.Bridge.Protocol;
 using PigeonPost.Bridge.Server;
 using PigeonPost.Tun;
 using Scriba;
@@ -87,7 +88,7 @@ internal sealed class App
             stopped.TrySetResult(reason);
         });
 
-        _logger.i("Server running. Waiting for client...");
+        _logger.i("Server running. Accepting clients...");
 
         var result = await Task.WhenAny(
             stopped.Task,
@@ -110,6 +111,20 @@ internal sealed class App
     private async Task RunClientAsync()
     {
         var tunName = _config.TunNames[0];
+        var clientId = _config.ClientId!;
+
+        uint hostIpv4;
+        try
+        {
+            hostIpv4 = TunIpv4AddressResolver.ResolveIpv4Address(tunName);
+        }
+        catch (Exception ex)
+        {
+            _logger.e($"Failed to resolve TUN IPv4 address: {ex.Message}");
+            return;
+        }
+
+        _logger.i($"Client ID: {clientId}, host IPv4: {FormatIp(hostIpv4)}");
 
         using var tun = new TunDevice();
         tun.Open(tunName);
@@ -121,6 +136,8 @@ internal sealed class App
         using var bridge = new BridgeClass(tun, buffer, _logger, _config.Verbose);
         bridge.Start();
 
+        var handshake = new ClientHandshake(new ClientId(clientId), hostIpv4);
+
         while (!_shutdownRequested)
         {
             _logger.i("Connecting to server...");
@@ -129,7 +146,7 @@ internal sealed class App
             if (transport is not IAckRawClient ackClient)
                 throw new InvalidOperationException("Transport is not an IAckRawClient.");
 
-            var handler = new BridgeClientHandler(bridge);
+            var handler = new BridgeClientHandler(bridge, handshake);
             ackClient.Init(handler);
 
             var stopped = new TaskCompletionSource<StopReason>();
@@ -173,50 +190,100 @@ internal sealed class App
 
     private async Task RunDebugAsync()
     {
-        var tunName1 = _config.TunNames[0];
-        var tunName2 = _config.TunNames[1];
+        int clientCount = _config.DebugClientCount;
+        var tunNames = _config.TunNames;
 
-        using var tun1 = new TunDevice();
-        using var tun2 = new TunDevice();
-        tun1.Open(tunName1);
-        tun1.SetSendBufferSize(1048576);
-        tun2.Open(tunName2);
-        tun2.SetSendBufferSize(1048576);
-        _logger.i($"TUN devices '{tunName1}' and '{tunName2}' opened.");
+        string serverTunName = tunNames[0];
+        var clientTunNames = new List<string>();
+        for (int i = 1; i < tunNames.Count; i++)
+            clientTunNames.Add(tunNames[i]);
 
-        var serverHub = new ServerHub(_logger, tun1);
-        var buffer1 = new PacketBuffer(_config.BufferSizeBytes);
-        var buffer2 = new PacketBuffer(_config.BufferSizeBytes);
-        using var bridge1 = new BridgeClass(tun1, buffer1, _logger, _config.Verbose);
-        using var bridge2 = new BridgeClass(tun2, buffer2, _logger, _config.Verbose);
+        using var serverTun = new TunDevice();
+        serverTun.Open(serverTunName);
+        serverTun.SetSendBufferSize(1048576);
+        _logger.i($"Server TUN '{serverTunName}' opened.");
 
-        bridge1.SetPacketHandler(packet => serverHub.OnPacketFromTun(packet));
+        var serverHub = new ServerHub(_logger, serverTun);
+        var serverBuffer = new PacketBuffer(_config.BufferSizeBytes);
+        using var serverBridge = new BridgeClass(serverTun, serverBuffer, _logger, _config.Verbose);
+        serverBridge.SetPacketHandler(packet => serverHub.OnPacketFromTun(packet));
+
+        var clientBridges = new List<BridgeClass>();
+        var clientTuns = new List<TunDevice>();
+        var clientHandlers = new List<BridgeClientHandler>();
+        var clientTransports = new List<AckRawDirectClient>();
+
+        for (int i = 0; i < clientCount; i++)
+        {
+            string clientTunName = clientTunNames[i];
+            string debugClientId = $"debug-client-{i + 1}";
+
+            var clientTun = new TunDevice();
+            clientTun.Open(clientTunName);
+            clientTun.SetSendBufferSize(1048576);
+            clientTuns.Add(clientTun);
+
+            uint clientIpv4;
+            try
+            {
+                clientIpv4 = TunIpv4AddressResolver.ResolveIpv4Address(clientTunName);
+            }
+            catch (Exception ex)
+            {
+                _logger.e($"Failed to resolve TUN IPv4 for '{clientTunName}': {ex.Message}");
+                return;
+            }
+
+            _logger.i($"Debug client '{debugClientId}': TUN={clientTunName}, host={FormatIp(clientIpv4)}");
+
+            var clientBuffer = new PacketBuffer(_config.BufferSizeBytes);
+            var clientBridge = new BridgeClass(clientTun, clientBuffer, _logger, _config.Verbose);
+            clientBridges.Add(clientBridge);
+
+            var handshake = new ClientHandshake(new ClientId(debugClientId), clientIpv4);
+            clientHandlers.Add(new BridgeClientHandler(clientBridge, handshake));
+
+            var clientTransport = new AckRawDirectClient(ExtractDirectServerName(_config.PontifexUrl),
+                _logger, MemoryRental.Shared);
+            clientTransports.Add(clientTransport);
+        }
 
         var serverNameActual = ExtractDirectServerName(_config.PontifexUrl);
-
         var server = new AckRawDirectServer(serverNameActual, _logger, MemoryRental.Shared);
         server.Init(new BridgeServerAcknowledger(serverHub));
 
-        var client = new AckRawDirectClient(serverNameActual, _logger, MemoryRental.Shared);
-        client.Init(new BridgeClientHandler(bridge2));
-
         server.Start(reason => _logger.i($"Debug server stopped: {reason.Type}"));
-        client.Start(reason => _logger.i($"Debug client stopped: {reason.Type}"));
+        serverBridge.Start();
 
-        bridge1.Start();
-        bridge2.Start();
+        for (int i = 0; i < clientCount; i++)
+        {
+            var clientTransport = clientTransports[i];
+            clientTransport.Init(clientHandlers[i]);
+            int idx = i;
+            clientTransport.Start(reason => _logger.i($"Debug client {idx + 1} stopped: {reason.Type}"));
+            clientBridges[i].Start();
+        }
 
-        _logger.i($"Debug mode running: {tunName1} ←→ {tunName2}");
+        _logger.i($"Debug mode running: {serverTunName} ←→ {clientCount} client(s)");
 
         await WaitForShutdownAsync();
 
-        client.Stop(Pontifex.StopReason.UserIntention);
-        bridge2.Stop(Pontifex.StopReason.UserIntention);
+        _logger.i("Shutting down debug mode...");
+
+        foreach (var clientTransport in clientTransports)
+            clientTransport.Stop(Pontifex.StopReason.UserIntention);
+
+        foreach (var clientBridge in clientBridges)
+            clientBridge.Stop(Pontifex.StopReason.UserIntention);
+
+        foreach (var clientTun in clientTuns)
+            clientTun.Close();
+
         serverHub.StopAccepting();
         serverHub.StopAll(Pontifex.StopReason.UserIntention);
-        bridge1.Stop(Pontifex.StopReason.UserIntention);
-        tun2.Close();
-        tun1.Close();
+        serverBridge.Stop(Pontifex.StopReason.UserIntention);
+        serverTun.Close();
+
         _logger.i("Debug instance shut down.");
     }
 
@@ -262,5 +329,10 @@ internal sealed class App
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private static string FormatIp(uint ip)
+    {
+        return $"{(ip >> 24) & 0xFF}.{(ip >> 16) & 0xFF}.{(ip >> 8) & 0xFF}.{ip & 0xFF}";
     }
 }
