@@ -3,6 +3,7 @@ using Pontifex;
 using Pontifex.Abstractions.Endpoints.Client;
 using Pontifex.Abstractions.Handlers.Client;
 using Pontifex.Utils;
+using PigeonPost.Bridge.Protocol;
 using PigeonPost.Bridge.Utils;
 
 namespace PigeonPost.Bridge.Handlers;
@@ -10,14 +11,29 @@ namespace PigeonPost.Bridge.Handlers;
 internal sealed class BridgeClientHandler : IAckRawClientHandler
 {
     private readonly IBridge _bridge;
+    private readonly ClientHandshake? _handshake;
 
-    public BridgeClientHandler(IBridge bridge)
+    public BridgeClientHandler(IBridge bridge, ClientHandshake? handshake = null)
     {
         _bridge = bridge;
+        _handshake = handshake;
     }
 
     public void OnConnected(IAckRawServerEndpoint endPoint, UnionDataList ackResponse)
     {
+        if (ackResponse.TryPopFirst(out IMultiRefReadOnlyByteArray? ackData) && ackData != null)
+        {
+            byte[] ackBytes = PontifexPacketConverter.ExtractPacket(ackData);
+            var ack = HandshakeCodec.DecodeAck(ackBytes);
+            if (ack != null && ack.Status == HandshakeAckStatus.Rejected)
+            {
+                _bridge.OnTransportStopped(new Pontifex.StopReasons.ExceptionFail(
+                    "handshake", new System.InvalidOperationException($"Handshake rejected: {ack.RejectCode}"),
+                    $"Handshake rejected: {ack.RejectCode}"));
+                return;
+            }
+        }
+
         _bridge.OnEndpointConnected(endPoint);
     }
 
@@ -34,6 +50,11 @@ internal sealed class BridgeClientHandler : IAckRawClientHandler
 
     public void WriteAckData(UnionDataList ackData)
     {
+        if (_handshake != null)
+        {
+            byte[] handshakeBytes = HandshakeCodec.EncodeRequest(_handshake);
+            ackData.PutFirst(new UnionData(new StaticReadOnlyByteArray(handshakeBytes)));
+        }
     }
 
     public void OnDisconnected(StopReason reason)
