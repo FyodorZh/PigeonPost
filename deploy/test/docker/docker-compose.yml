@@ -39,7 +39,7 @@ services:
       TUN_NAME: tun0
       TUN_IP: 10.0.0.2
       PEER_IP: 10.0.0.1
-    command: --role client --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
+    command: --role client --client-id pp-test-client --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
     networks:
       - pigeon-net
 
