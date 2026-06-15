@@ -3,12 +3,22 @@
 ## Overview
 
 PigeonPost is a .NET 10 console application that bridges TUN virtual network devices
-over a transport layer, creating a P2P bidirectional IP tunnel between two Linux
-machines. It runs on .NET 10 (`net10.0`), Linux only (Debian/Ubuntu), with no
-implicit usings and nullable enabled project-wide.
+over a transport layer, creating a bidirectional IP tunnel between Linux machines.
+In the current V1 implementation, one server can bridge multiple concurrent clients.
+It runs on .NET 10 (`net10.0`), Linux only (Debian/Ubuntu), with no implicit usings
+and nullable enabled project-wide.
+
+PigeonPost now implements the V1 `1-to-many` server model with explicit client
+identity, exact-host IPv4 routing, and separate client/server runtime responsibilities.
 
 ```
-(real NIC on A) ←routing→ (TUN on A) ←→ (PigeonPost on A) ←transport→ (PigeonPost on B) ←→ (TUN on B) ←routing→ (real NIC on B)
+(server WAN) ←routing→ (server TUN) ←→ (PigeonPost server)
+                                       ↕ transport
+                   ┌───────────────────┼───────────────────┐
+                   ↓                   ↓                   ↓
+            (PigeonPost client) (PigeonPost client) (PigeonPost client)
+                   ↕                   ↕                   ↕
+               (client TUN)       (client TUN)       (client TUN)
 ```
 
 ## Project Structure
@@ -18,10 +28,17 @@ PigeonPost.sln
 ├── src/
 │   ├── PigeonPost/             Console app — entry point, CLI parsing, orchestration
 │   ├── PigeonPost.Tun/         Class library — Linux TUN device I/O via P/Invoke
-│   └── PigeonPost.Bridge/      Class library — packet buffering, Pontifex handlers
+│   └── PigeonPost.Bridge/      Class library — client bridge, protocol, server hub, Pontifex handlers
+│       ├── Protocol/           Handshake codec, client identity, IPv4 packet parsing
+│       ├── Server/             Session registry and exact-host routing hub
+│       └── Handlers/           Pontifex client/server handlers and acknowledger
 ├── tests/
-│   ├── PigeonPost.Tests/       NUnit — CLI parsing, debug mode E2E, reconnection
-│   ├── PigeonPost.Bridge.Tests/ NUnit — packet buffer, bridge, direct transport
+│   ├── PigeonPost.Tests/       NUnit — CLI parsing, app/debug integration, reconnection
+│   │   ├── App/                Debug CLI coverage
+│   │   └── Integration/        Debug mode, reconnection, Linux TUN integration
+│   ├── PigeonPost.Bridge.Tests/ NUnit — packet buffer, protocol, server hub, direct transport
+│   │   ├── Protocol/           Handshake codec and packet parser tests
+│   │   └── Server/             Session registry, routing, validation tests
 │   └── PigeonPost.Tun.Tests/   NUnit — TUN device contracts, constants, P/Invoke
 ├── deploy/
 │   ├── client/                   deploy-docker.sh + deploy-plain.sh + pre-deploy.sh
@@ -35,15 +52,37 @@ PigeonPost.sln
 └── pontifex.md                  Pontifex transport library reference (1296 lines)
 ```
 
+## Implementation Status
+
+### Current V1 implementation
+- Server runtime owns one TUN device and supports multiple concurrent client sessions.
+- Each client session is keyed by `clientId` and one advertised IPv4 host address.
+- Client runtime reconnects forever and uses one TUN device.
+- Debug mode simulates one server and `N` concurrent clients using Direct transport.
+
+### Architecture rules
+Important V1 rules:
+- one client == one advertised IPv4 host route
+- explicit `clientId` in handshake
+- duplicate `clientId` and duplicate host-IP claims are rejected
+- IPv4-only server-side routing in V1
+- no fallback route and no server-side buffering for missing routes
+- client and server runtime responsibilities are split into separate abstractions
+- invalid, malformed, unmatched, or invalid-source packets are dropped and logged
+- no authentication and no backward-compatibility mode in V1
+
+These rules are design constraints, not optional implementation details.
+
 ## Three Runtime Roles
 
 | Role   | Behavior |
 |--------|----------|
-| **Server** | Listens via Pontifex for a single client, bridges to one TUN. Stays running and accepts new connections. |
+| **Server** | Listens via Pontifex for multiple simultaneous clients, bridges them to one TUN device, and routes packets by exact IPv4 host match. Rejects duplicate `clientId` and duplicate host-IP claims during handshake. |
 | **Client** | Connects to a server via Pontifex, bridges to one TUN. Loops forever, reconnecting after every disconnect with a 1-second delay. |
-| **Debug**  | Single-process mode: creates two TUNs on the same machine, uses Direct (in-process) Pontifex transport. Server does not need explicit stopping (Direct transport manager is AppDomain-scoped). |
+| **Debug**  | Single-process mode that runs one server plus `N` concurrent clients using Direct transport. Uses one server TUN and one client TUN per simulated client. |
 
-The connection model is strictly **1-to-1** per app instance: one server ↔ one client.
+The connection model is now **1-to-many** on the server side and **single-peer** on the
+client side.
 
 ## Key Design Decisions
 
@@ -53,21 +92,36 @@ device creation are handled externally (by `docker-entrypoint.sh` or host `pre-d
 This separation avoids the app needing `NET_ADMIN` for device creation — only the
 container/host scripts need root.
 
+This remains true in the current `1-to-many` design. The app continues to operate on
+pre-existing TUN devices rather than creating network topology itself.
+
 ### Packets are buffered before the transport connects
 The TUN reader thread starts **immediately** at launch — before any Pontifex handshake.
 Outgoing packets are buffered in a bounded FIFO queue (byte-capacity capped, default
 10 MB). When the buffer is full, the **newest** packets are dropped (not oldest).
 This ensures the oldest queued packets get delivered first when the connection comes up.
 
+This buffering rule applies to the client-side single-peer transport path. The multi-
+client server routing path drops packets immediately
+when no matching client route exists or when the selected client is unavailable.
+
 ### Incoming packets are never buffered
 Packets received from Pontifex are written directly to the TUN device. No queuing on
 the inbound path. This keeps latency minimal for traffic flowing from the remote side.
+
+The same direct-write rule applies to packets accepted from clients
+after source-IP validation.
 
 ### Client reconnects forever
 The client role wraps its Pontifex transport in a `while (!shutdownRequested)` loop.
 On disconnect it waits 1 second and creates a fresh transport. This handles network
 outages and server restarts transparently. The reconnectable protocol from Pontifex is
 not used — PigeonPost handles reconnection at the application level for V1.
+
+### Client advertises its TUN IPv4 automatically
+The client resolves the IPv4 address configured on its TUN interface and advertises
+that address during the handshake. V1 requires exactly one IPv4 address on the client
+TUN interface; zero or multiple IPv4 addresses are treated as configuration errors.
 
 ### No async/await in the data path
 TUN I/O runs on a dedicated blocking thread (`PigeonPost-TunReader`). Pontifex callbacks
@@ -78,14 +132,15 @@ the `WaitForShutdownAsync` pattern.
 ### Threading model
 - One dedicated `Thread` per TUN reader (named `PigeonPost-TunReader`, background)
 - Pontifex callbacks arrive on transport-internal threads
-- `lock(_endpointLock)` protects the endpoint reference
-- `lock(_lock)` protects the PacketBuffer queue
+- `lock(_endpointLock)` protects the client-side endpoint reference inside `Bridge`
+- `lock(_lock)` protects the `PacketBuffer` queue and the `ServerHub` session registry
 - Async/await only in orchestration code (`App.cs`), not in the hot path
 
 ### Graceful shutdown on SIGTERM/SIGINT
 On POSIX signals, `RequestShutdown()` sets a flag + cancels a `CancellationTokenSource`.
-The app then: (1) stops accepting new Pontifex connections, (2) drains buffered packets,
-(3) closes the transport, (4) closes TUN file descriptors.
+The app then:
+- **Server/Debug**: stops accepting new clients, disconnects active sessions, stops runtime components, closes TUN file descriptors.
+- **Client**: stops the reconnect loop, stops the active transport, stops the bridge, closes the TUN file descriptor.
 
 ### Buffer overflow drops newest, not oldest
 The `PacketBuffer` is a bounded byte-capacity queue. When a new packet would exceed
@@ -113,22 +168,25 @@ dotnet publish src/PigeonPost/PigeonPost.csproj -c Release -o /app
 ```
 
 ### Test categories
-- **Unit tests** — run on any OS: `PacketBufferTests`, `BridgeTests` (with fakes), `CliParserTests`, `TunDeviceContractTests`, constant/interop struct tests.
-- **Integration tests** — **Linux only**: `DebugModeEndToEndTests` (opens real TUNs, sends real ICMP packets), `TunDeviceIntegrationTests` (opens preconfigured TUN devices), `PontifexDirectTransportTests` (in-process transport with fake TUN).
+- **Unit tests** — run on any OS: packet buffer tests, handshake codec tests, IPv4 parser tests, server session registry tests, routing/validation tests, CLI parser tests, TUN contract tests.
+- **Integration tests** — **Linux only**: `DebugModeEndToEndTests`, `ReconnectionTests`, `TunDeviceIntegrationTests`, and Direct transport integration tests covering server/client interaction.
 
 Some integration tests require pre-created TUN devices (`tunA`, `tunB`). Run the test Docker compose to get a clean environment.
 
 ## CLI Usage
 
 ```
-PigeonPost --role <server|client|debug> --tun <name> [--tun <name2>] --url <url> [options]
+PigeonPost --role <server|client|debug> --tun <name> [--tun <name2> ...] --url <url>
+           [--client-id <id>] [--debug-clients <N>] [options]
 ```
 
 | Argument | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `-r, --role` | Yes | — | `server`, `client`, or `debug` |
-| `-t, --tun` | Server/Client: once. Debug: optional | `tunA tunB` (debug) | TUN device name(s) |
+| `-t, --tun` | Server/Client: once. Debug: optional/repeatable | Debug: auto-generated if omitted | TUN device name(s) |
 | `-u, --url` | Yes | — | Pontifex transport URL (e.g. `tcp\|10.0.0.1:9000/30`) |
+| `--client-id` | Client only | — | Required client identity sent during handshake |
+| `--debug-clients` | Debug only | `1` | Number of concurrent debug clients |
 | `-b, --buffer-size` | No | `10485760` (10 MB) | Outgoing packet buffer in bytes (1500–1,073,741,824) |
 | `-v, --verbose` | No | `false` | Log every packet size |
 | `-h, --help` | No | — | Show man-page help |
@@ -139,14 +197,14 @@ PigeonPost --role <server|client|debug> --tun <name> [--tun <name2>] --url <url>
 
 ### Examples
 ```bash
-# Server on TCP port 9000, bridging tun0
+# Server on TCP port 9000, bridging tun0 and accepting multiple clients
 PigeonPost --role server --tun tun0 --url 'tcp|0.0.0.0:9000/30'
 
 # Client connecting to the server, bridging tun1
-PigeonPost --role client --tun tun1 --url 'tcp|10.0.0.1:9000/30'
+PigeonPost --role client --client-id office-a --tun tun1 --url 'tcp|10.0.0.1:9000/30'
 
-# Debug mode with two TUN devices
-PigeonPost --role debug --tun tun0 --tun tun1 --url 'direct|ep_debug'
+# Debug mode with three clients
+PigeonPost --role debug --debug-clients 3 --url 'direct|ep_debug'
 ```
 
 ## NuGet Dependencies
@@ -231,6 +289,9 @@ to one must be mirrored in the other:
 | `deploy/client/deploy-docker.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 | `deploy/client/deploy-plain.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 
+Client deployment artifacts accept `CLIENT_ID` and pass it to `--client-id`. Current
+client helper scripts default `CLIENT_ID` to `pp-client-1` if it is not set explicitly.
+
 ### Idempotency Requirements
 
 All deployment and setup scripts must be **fully idempotent** — running them multiple
@@ -289,8 +350,10 @@ one-element list.
 
 **Handshake**: Acknowledging (`IAck` prefix) transports perform a 3-way handshake:
 client sends `WriteAckData`, server calls `TryAck` (accept/reject), then handlers
-receive `OnConnected`. PigeonPost's `BridgeServerAcknowledger` accepts all connections
-unconditionally.
+receive `OnConnected`. PigeonPost uses a compact binary handshake carrying
+`clientId` and one advertised IPv4 host route. The server acknowledger rejects
+duplicate identities, duplicate host-IP claims, malformed handshakes, and shutdown-time
+connections, and reports rejection reasons to the client via a compact ack payload.
 
 **Stop reasons**: Typed disconnect reasons (`StopReason.UserIntention`, `TimeOut`,
 `ExceptionFail`, etc.). The client handler routes `OnStopped` to the bridge which
@@ -307,10 +370,13 @@ PigeonPost acts as a lightweight alternative to WireGuard/OpenVPN for linking tw
 networks. The server is placed on a machine with a public IP; the client sits behind
 NAT. IP forwarding and NAT rules on both ends route traffic through the tunnel.
 
+In the current V1 implementation, each client advertises exactly one remote host and
+the server routes by exact host match.
+
 ### Secondary: Local development/debugging
-Debug mode runs both sides in a single process using Direct transport — no network
-required. Useful for testing packet flow, buffer behavior, and transport integration
-without deploying to two machines.
+Debug mode runs one server and `N` clients in a single process using Direct transport —
+no network required. Useful for testing packet flow, routing, rejection behavior, and
+transport integration without deploying to multiple machines.
 
 ### Testing: Docker-based integration with iperf3
 The test Docker compose brings up server + client containers on a bridge network with
@@ -326,6 +392,22 @@ the tunnel.
 - **Transport**: `IAckReliableRaw` (guaranteed delivery). Known inefficiency for UDP
   tunnels — V2 may use unreliable transport for UDP-in-UDP.
 - **Pontifex TCP defaults**: 180s disconnect timeout, ~100 MB max message, Nagle disabled
+
+Current V1 packet rules:
+- server-side routing is IPv4-only in V1
+- each client owns exactly one advertised IPv4 host address
+- client->server packets must have source IP equal to the advertised host IP
+- unmatched, malformed, non-IPv4, or invalid-source packets are dropped and logged
+
+## Operational Guidance
+
+When extending the current V1 architecture, preserve these invariants:
+- keep `clientId` ownership and advertised host-IP ownership explicit
+- keep routing exact-host and IPv4-only unless the protocol is intentionally expanded
+- keep duplicate identity and duplicate host-IP rejection deterministic
+- keep missing-route and invalid-source behavior as drop-and-log unless a new design explicitly replaces it
+- keep deployment artifacts and CLI behavior equivalent across Docker and plain-host flows
+- add tests before broadening routing, handshake, or runtime responsibilities
 
 ## Project Conventions
 
