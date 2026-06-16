@@ -37,9 +37,9 @@ internal sealed class BridgeClientHandler : IAckRawClientHandler
 
     public void OnReceived(UnionDataList receivedBuffer)
     {
-        using var guard = IReleasableResource_Ext.AsDisposable(receivedBuffer);
+        using var guard = receivedBuffer.AsDisposable();
 
-        if (receivedBuffer.TryPopFirst(out IMultiRefReadOnlyByteArray? data) && data != null)
+        if (receivedBuffer.TryPopFirst(out IMultiRefReadOnlyByteArray? data))
         {
             byte[] packet = PontifexPacketConverter.ExtractPacket(data);
             _bridge.OnPacketReceived(packet);

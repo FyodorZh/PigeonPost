@@ -128,7 +128,7 @@ public sealed class BridgeImpl : IBridge, IDisposable
 
         _logger.i("Pontifex endpoint connected.");
 
-        while (_running && _buffer.TryDequeue(out byte[]? packet))
+        while (_running && _buffer.TryDequeue(out byte[] packet))
         {
             if (TryGetEndpoint(out var ep))
                 SendPacket(ep, packet);
