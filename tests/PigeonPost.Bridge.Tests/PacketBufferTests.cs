@@ -13,7 +13,6 @@ public class PacketBufferTests
         var buf = new PacketBuffer(1000);
         Assert.That(buf.Count, Is.EqualTo(0));
         Assert.That(buf.TotalBytes, Is.EqualTo(0));
-        Assert.That(buf.DroppedPackets, Is.EqualTo(0));
     }
 
     [Test]
@@ -57,7 +56,6 @@ public class PacketBufferTests
 
         Assert.That(buf.Count, Is.EqualTo(1));
         Assert.That(buf.TotalBytes, Is.EqualTo(60));
-        Assert.That(buf.DroppedPackets, Is.EqualTo(1));
     }
 
     [Test]
@@ -80,7 +78,6 @@ public class PacketBufferTests
     {
         var buf = new PacketBuffer(0);
         Assert.That(buf.TryEnqueue(new byte[1]), Is.False);
-        Assert.That(buf.DroppedPackets, Is.EqualTo(1));
     }
 
     [Test]

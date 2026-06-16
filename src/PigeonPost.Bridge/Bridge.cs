@@ -28,6 +28,7 @@ public sealed class Bridge : IBridge, IDisposable
     private long _packetsOut;
     private long _bytesIn;
     private long _bytesOut;
+    private long _droppedPackets;
 
     public event Action<StopReason>? OnStopped;
 
@@ -101,8 +102,9 @@ public sealed class Bridge : IBridge, IDisposable
                 {
                     if (!_buffer.TryEnqueue(packet))
                     {
+                        Interlocked.Increment(ref _droppedPackets);
                         if (_verbose)
-                            _logger.w($"Buffer full, dropped packet ({bytesRead} bytes). Dropped total: {_buffer.DroppedPackets}");
+                            _logger.w($"Buffer full, dropped packet ({bytesRead} bytes). Dropped total: {_droppedPackets}");
                     }
                 }
             }

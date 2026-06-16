@@ -7,6 +7,14 @@ namespace PigeonPost.Tun;
 
 public static class TunIpv4AddressResolver
 {
+    /// <summary>
+    /// Resolves the single IPv4 address configured on the specified TUN interface.
+    /// </summary>
+    /// <param name="tunName">The name of the TUN interface (e.g. <c>tun0</c>).</param>
+    /// <returns>The IPv4 address as a network-byte-order <see cref="uint"/>.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// The interface was not found, has no IPv4 address, or has more than one IPv4 address.
+    /// </exception>
     public static uint ResolveIpv4Address(string tunName)
     {
         var iface = NetworkInterface.GetAllNetworkInterfaces()

@@ -9,12 +9,10 @@ public sealed class PacketBuffer : IPacketBuffer
     private readonly Queue<byte[]> _queue;
     private readonly object _lock = new();
     private int _totalBytes;
-    private long _dropped;
 
     public int Capacity => _capacity;
     public int Count { get { lock (_lock) return _queue.Count; } }
     public int TotalBytes { get { lock (_lock) return _totalBytes; } }
-    public long DroppedPackets { get { lock (_lock) return _dropped; } }
 
     public PacketBuffer(int capacity)
     {
@@ -31,7 +29,6 @@ public sealed class PacketBuffer : IPacketBuffer
         {
             if (_totalBytes + packet.Length > _capacity)
             {
-                _dropped++;
                 return false;
             }
 
