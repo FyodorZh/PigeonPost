@@ -7,14 +7,9 @@ using Pontifex;
 using Pontifex.Abstractions.Endpoints;
 using Pontifex.Transports.Direct;
 using PigeonPost.Bridge;
-using PigeonPost.Bridge.Handlers;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
-using PigeonPost.Bridge.Utils;
 using PigeonPost.Tun;
 using Scriba;
 using Scriba.Consumers;
-using BridgeClass = PigeonPost.Bridge.Bridge;
 
 namespace PigeonPost.Tests.Integration;
 
@@ -95,8 +90,8 @@ public class ReconnectionTests
         var bufferA = new PacketBuffer(100_000);
         var bufferB = new PacketBuffer(100_000);
 
-        using var bridgeA = new BridgeClass(tunA, bufferA, StaticLogger.Instance, verbose: true);
-        using var bridgeB = new BridgeClass(tunB, bufferB, StaticLogger.Instance, verbose: true);
+        using var bridgeA = new BridgeImpl(tunA, bufferA, StaticLogger.Instance, verbose: true);
+        using var bridgeB = new BridgeImpl(tunB, bufferB, StaticLogger.Instance, verbose: true);
 
         var serverHub = new ServerHub(StaticLogger.Instance, tunA);
         bridgeA.SetPacketHandler(packet => serverHub.OnPacketFromTun(packet));

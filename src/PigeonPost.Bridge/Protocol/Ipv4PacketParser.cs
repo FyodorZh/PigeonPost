@@ -1,6 +1,6 @@
 using System;
 
-namespace PigeonPost.Bridge.Protocol;
+namespace PigeonPost.Bridge;
 
 public static class Ipv4PacketParser
 {

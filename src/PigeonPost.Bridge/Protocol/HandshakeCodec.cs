@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace PigeonPost.Bridge.Protocol;
+namespace PigeonPost.Bridge;
 
 public static class HandshakeCodec
 {

@@ -1,8 +1,7 @@
 using System;
 using Pontifex.Abstractions.Endpoints;
-using PigeonPost.Bridge.Protocol;
 
-namespace PigeonPost.Bridge.Server;
+namespace PigeonPost.Bridge;
 
 public sealed class ClientSession
 {

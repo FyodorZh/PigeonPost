@@ -6,9 +6,7 @@ using Pontifex;
 using Pontifex.Abstractions;
 using Pontifex.Abstractions.Endpoints;
 using Pontifex.Utils;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
-using PigeonPost.Bridge.Utils;
+using PigeonPost.Bridge;
 using Scriba;
 using Scriba.Consumers;
 

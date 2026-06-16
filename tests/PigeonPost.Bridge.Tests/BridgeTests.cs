@@ -12,7 +12,7 @@ public class BridgeTests
 {
     private FakeTunDevice _tun = null!;
     private PacketBuffer _buffer = null!;
-    private Bridge _bridge = null!;
+    private BridgeImpl _bridge = null!;
 
     [SetUp]
     public void Setup()
@@ -20,7 +20,7 @@ public class BridgeTests
         StaticLogger.Instance.AddConsumer(new ConsoleConsumer());
         _tun = new FakeTunDevice();
         _buffer = new PacketBuffer(1_000_000);
-        _bridge = new Bridge(_tun, _buffer, StaticLogger.Instance);
+        _bridge = new BridgeImpl(_tun, _buffer, StaticLogger.Instance);
     }
 
     [TearDown]

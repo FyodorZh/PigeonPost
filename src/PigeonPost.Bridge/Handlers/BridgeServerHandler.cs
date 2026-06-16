@@ -3,11 +3,8 @@ using Pontifex;
 using Pontifex.Abstractions.Endpoints.Server;
 using Pontifex.Abstractions.Handlers.Server;
 using Pontifex.Utils;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
-using PigeonPost.Bridge.Utils;
 
-namespace PigeonPost.Bridge.Handlers;
+namespace PigeonPost.Bridge;
 
 internal sealed class BridgeServerHandler : IAckRawServerHandler
 {

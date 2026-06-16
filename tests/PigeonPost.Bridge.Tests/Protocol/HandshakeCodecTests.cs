@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 using NUnit.Framework;
-using PigeonPost.Bridge.Protocol;
+using PigeonPost.Bridge;
 
 namespace PigeonPost.Bridge.Tests.Protocol;
 

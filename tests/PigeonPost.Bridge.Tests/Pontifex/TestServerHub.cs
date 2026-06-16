@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Pontifex.Abstractions.Endpoints;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
+using PigeonPost.Bridge;
 using Scriba;
 
 namespace PigeonPost.Bridge.Tests.Pontifex;

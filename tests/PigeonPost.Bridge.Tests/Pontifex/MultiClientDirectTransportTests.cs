@@ -3,9 +3,7 @@ using Actuarius.Memory;
 using NUnit.Framework;
 using Pontifex;
 using Pontifex.Transports.Direct;
-using PigeonPost.Bridge.Handlers;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
+using PigeonPost.Bridge;
 using Scriba;
 using Scriba.Consumers;
 

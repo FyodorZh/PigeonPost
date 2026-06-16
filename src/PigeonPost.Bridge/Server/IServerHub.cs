@@ -1,7 +1,6 @@
 using Pontifex;
-using PigeonPost.Bridge.Protocol;
 
-namespace PigeonPost.Bridge.Server;
+namespace PigeonPost.Bridge;
 
 public interface IServerHub
 {

@@ -4,11 +4,10 @@ using Pontifex;
 using Pontifex.Abstractions;
 using Pontifex.Abstractions.Endpoints;
 using Pontifex.Utils;
-using PigeonPost.Bridge.Protocol;
 using PigeonPost.Tun;
 using Scriba;
 
-namespace PigeonPost.Bridge.Server;
+namespace PigeonPost.Bridge;
 
 public class ServerHub : IServerHub, IDisposable
 {
@@ -126,7 +125,7 @@ public class ServerHub : IServerHub, IDisposable
             return;
         }
 
-        var message = Utils.PontifexPacketConverter.CreateMessage(packet);
+        var message = PontifexPacketConverter.CreateMessage(packet);
         var result = targetEndpoint.Send(message);
 
         if (result != SendResult.Ok)

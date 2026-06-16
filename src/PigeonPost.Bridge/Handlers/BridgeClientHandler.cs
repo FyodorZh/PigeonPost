@@ -3,10 +3,8 @@ using Pontifex;
 using Pontifex.Abstractions.Endpoints.Client;
 using Pontifex.Abstractions.Handlers.Client;
 using Pontifex.Utils;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Utils;
 
-namespace PigeonPost.Bridge.Handlers;
+namespace PigeonPost.Bridge;
 
 internal sealed class BridgeClientHandler : IAckRawClientHandler
 {

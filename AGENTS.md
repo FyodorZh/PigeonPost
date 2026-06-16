@@ -415,7 +415,7 @@ When extending the current V1 architecture, preserve these invariants:
 - Nullable reference types enabled (`<Nullable>enable</Nullable>`)
 - Warnings treated as errors (`<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`)
 - No comments in source code unless essential
-- Namespaces match folder structure
+- Namespaces do not mirror directory structure — use a flat namespace per project (e.g. all types in `src/PigeonPost.Bridge/` use `namespace PigeonPost.Bridge;` regardless of subdirectory)
 - Internal implementation classes are `internal`; public APIs are `public`
 - Test projects have `InternalsVisibleTo` via csproj
 - Tests use NUnit 4

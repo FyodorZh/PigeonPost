@@ -1,4 +1,4 @@
-namespace PigeonPost.Bridge.Server;
+namespace PigeonPost.Bridge;
 
 public enum SessionRegistrationResult
 {

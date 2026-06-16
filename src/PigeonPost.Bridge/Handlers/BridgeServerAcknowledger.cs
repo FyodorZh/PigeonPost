@@ -2,16 +2,14 @@ using Actuarius.Memory;
 using Pontifex.Abstractions.Acknowledgers;
 using Pontifex.Abstractions.Handlers.Server;
 using Pontifex.Utils;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Utils;
 
-namespace PigeonPost.Bridge.Handlers;
+namespace PigeonPost.Bridge;
 
 internal sealed class BridgeServerAcknowledger : IRawServerAcknowledger<BridgeServerHandler>
 {
-    private readonly Server.ServerHub _hub;
+    private readonly ServerHub _hub;
 
-    public BridgeServerAcknowledger(Server.ServerHub hub)
+    public BridgeServerAcknowledger(ServerHub hub)
     {
         _hub = hub;
     }
@@ -34,13 +32,13 @@ internal sealed class BridgeServerAcknowledger : IRawServerAcknowledger<BridgeSe
 
         switch (result)
         {
-            case Server.SessionRegistrationResult.Accepted:
+            case SessionRegistrationResult.Accepted:
                 return new BridgeServerHandler(_hub, handshake, null);
-            case Server.SessionRegistrationResult.RejectedDuplicateId:
+            case SessionRegistrationResult.RejectedDuplicateId:
                 return new BridgeServerHandler(_hub, null, HandshakeRejectCode.DuplicateClientId);
-            case Server.SessionRegistrationResult.RejectedDuplicateHostIp:
+            case SessionRegistrationResult.RejectedDuplicateHostIp:
                 return new BridgeServerHandler(_hub, null, HandshakeRejectCode.DuplicateHostIp);
-            case Server.SessionRegistrationResult.RejectedServerShuttingDown:
+            case SessionRegistrationResult.RejectedServerShuttingDown:
                 return new BridgeServerHandler(_hub, null, HandshakeRejectCode.ServerShuttingDown);
             default:
                 return new BridgeServerHandler(_hub, null, HandshakeRejectCode.InvalidHandshake);

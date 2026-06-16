@@ -1,4 +1,4 @@
-namespace PigeonPost.Bridge.Protocol;
+namespace PigeonPost.Bridge;
 
 public enum HandshakeRejectCode : byte
 {

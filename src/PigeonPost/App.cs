@@ -11,12 +11,8 @@ using Pontifex.StopReasons;
 using Pontifex.Transports.Direct;
 using Pontifex.Transports.Tcp;
 using PigeonPost.Bridge;
-using PigeonPost.Bridge.Handlers;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
 using PigeonPost.Tun;
 using Scriba;
-using BridgeClass = PigeonPost.Bridge.Bridge;
 
 namespace PigeonPost;
 
@@ -67,7 +63,7 @@ internal sealed class App
         var serverHub = new ServerHub(_logger, tun);
         var buffer = new PacketBuffer(_config.BufferSizeBytes);
 
-        using var bridge = new BridgeClass(tun, buffer, _logger, _config.Verbose);
+        using var bridge = new BridgeImpl(tun, buffer, _logger, _config.Verbose);
         bridge.SetPacketHandler(packet => serverHub.OnPacketFromTun(packet));
 
         var transport = CreateTransport(_config.PontifexUrl, isServer: true);
@@ -131,7 +127,7 @@ internal sealed class App
 
         var buffer = new PacketBuffer(_config.BufferSizeBytes);
 
-        using var bridge = new BridgeClass(tun, buffer, _logger, _config.Verbose);
+        using var bridge = new BridgeImpl(tun, buffer, _logger, _config.Verbose);
         bridge.Start();
 
         var handshake = new ClientHandshake(new ClientId(clientId), hostIpv4);
@@ -202,10 +198,10 @@ internal sealed class App
 
         var serverHub = new ServerHub(_logger, serverTun);
         var serverBuffer = new PacketBuffer(_config.BufferSizeBytes);
-        using var serverBridge = new BridgeClass(serverTun, serverBuffer, _logger, _config.Verbose);
+        using var serverBridge = new BridgeImpl(serverTun, serverBuffer, _logger, _config.Verbose);
         serverBridge.SetPacketHandler(packet => serverHub.OnPacketFromTun(packet));
 
-        var clientBridges = new List<BridgeClass>();
+        var clientBridges = new List<BridgeImpl>();
         var clientTuns = new List<TunDevice>();
         var clientHandlers = new List<BridgeClientHandler>();
         var clientTransports = new List<AckRawDirectClient>();
@@ -233,7 +229,7 @@ internal sealed class App
             _logger.i($"Debug client '{debugClientId}': TUN={clientTunName}, host={FormatIp(clientIpv4)}");
 
             var clientBuffer = new PacketBuffer(_config.BufferSizeBytes);
-            var clientBridge = new BridgeClass(clientTun, clientBuffer, _logger, _config.Verbose);
+            var clientBridge = new BridgeImpl(clientTun, clientBuffer, _logger, _config.Verbose);
             clientBridges.Add(clientBridge);
 
             var handshake = new ClientHandshake(new ClientId(debugClientId), clientIpv4);

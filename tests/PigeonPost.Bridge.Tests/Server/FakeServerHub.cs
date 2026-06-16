@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using Pontifex;
 using Pontifex.Abstractions.Endpoints;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
+using PigeonPost.Bridge;
 
 namespace PigeonPost.Bridge.Tests.Server;
 

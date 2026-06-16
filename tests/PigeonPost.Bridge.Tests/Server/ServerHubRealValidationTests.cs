@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
+using PigeonPost.Bridge;
 using Scriba;
 using Scriba.Consumers;
 

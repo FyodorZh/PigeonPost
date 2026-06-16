@@ -1,7 +1,7 @@
 using Actuarius.Memory;
 using Pontifex.Utils;
 
-namespace PigeonPost.Bridge.Utils;
+namespace PigeonPost.Bridge;
 
 internal static class PontifexPacketConverter
 {

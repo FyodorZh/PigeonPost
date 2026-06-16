@@ -1,6 +1,5 @@
 using NUnit.Framework;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
+using PigeonPost.Bridge;
 
 namespace PigeonPost.Bridge.Tests.Server;
 

@@ -6,13 +6,9 @@ using NUnit.Framework;
 using Pontifex;
 using Pontifex.Transports.Direct;
 using PigeonPost.Bridge;
-using PigeonPost.Bridge.Handlers;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
 using PigeonPost.Tun;
 using Scriba;
 using Scriba.Consumers;
-using BridgeClass = PigeonPost.Bridge.Bridge;
 
 namespace PigeonPost.Tests.Integration;
 
@@ -28,8 +24,8 @@ public class DebugModeEndToEndTests
     private AckRawDirectClient _client = null!;
     private TunDevice _tunA = null!;
     private TunDevice _tunB = null!;
-    private BridgeClass _bridgeA = null!;
-    private BridgeClass _bridgeB = null!;
+    private BridgeImpl _bridgeA = null!;
+    private BridgeImpl _bridgeB = null!;
     private ServerHub _serverHub = null!;
 
     [SetUp]
@@ -45,8 +41,8 @@ public class DebugModeEndToEndTests
         var bufferA = new PacketBuffer(100_000);
         var bufferB = new PacketBuffer(100_000);
 
-        _bridgeA = new BridgeClass(_tunA, bufferA, StaticLogger.Instance, verbose: true);
-        _bridgeB = new BridgeClass(_tunB, bufferB, StaticLogger.Instance, verbose: true);
+        _bridgeA = new BridgeImpl(_tunA, bufferA, StaticLogger.Instance, verbose: true);
+        _bridgeB = new BridgeImpl(_tunB, bufferB, StaticLogger.Instance, verbose: true);
 
         _serverHub = new ServerHub(StaticLogger.Instance, _tunA);
         _bridgeA.SetPacketHandler(packet => _serverHub.OnPacketFromTun(packet));

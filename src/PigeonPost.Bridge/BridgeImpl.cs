@@ -4,14 +4,12 @@ using System.Threading;
 using Pontifex;
 using Pontifex.Abstractions.Endpoints;
 using Pontifex.StopReasons;
-using Pontifex.Utils;
-using PigeonPost.Bridge.Utils;
 using PigeonPost.Tun;
 using Scriba;
 
 namespace PigeonPost.Bridge;
 
-public sealed class Bridge : IBridge, IDisposable
+public sealed class BridgeImpl : IBridge, IDisposable
 {
     private readonly ITunDevice _tun;
     private readonly IPacketBuffer _buffer;
@@ -32,7 +30,7 @@ public sealed class Bridge : IBridge, IDisposable
 
     public event Action<StopReason>? OnStopped;
 
-    public Bridge(ITunDevice tun, IPacketBuffer buffer, ILogger logger, bool verbose = false)
+    public BridgeImpl(ITunDevice tun, IPacketBuffer buffer, ILogger logger, bool verbose = false)
     {
         _tun = tun ?? throw new ArgumentNullException(nameof(tun));
         _buffer = buffer ?? throw new ArgumentNullException(nameof(buffer));

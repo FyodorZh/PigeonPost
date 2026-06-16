@@ -11,10 +11,7 @@ using Pontifex.Abstractions.Handlers.Client;
 using Pontifex.Abstractions.Handlers.Server;
 using Pontifex.Transports.Direct;
 using Pontifex.Utils;
-using PigeonPost.Bridge.Handlers;
-using PigeonPost.Bridge.Protocol;
-using PigeonPost.Bridge.Server;
-using PigeonPost.Bridge.Utils;
+using PigeonPost.Bridge;
 using Scriba;
 using Scriba.Consumers;
 
