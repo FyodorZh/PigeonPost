@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>PigeonPost.Tun.Virtual</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PigeonPost.Tun\PigeonPost.Tun.csproj" />
+  </ItemGroup>
+</Project>

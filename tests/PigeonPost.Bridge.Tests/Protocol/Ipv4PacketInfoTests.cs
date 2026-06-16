@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using PigeonPost.Bridge;
+using PigeonPost.Tun;
 
 namespace PigeonPost.Bridge.Tests.Protocol;
 
