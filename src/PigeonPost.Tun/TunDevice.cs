@@ -1,8 +1,6 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace PigeonPost.Tun;
 
@@ -61,16 +59,6 @@ public sealed class TunDevice : ITunDevice
         if (!IsOpen) throw new InvalidOperationException("TUN device not open.");
         nint n = NativeMethods.write(_fd, buffer, (nint)buffer.Length);
         if (n < 0) throw new IOException($"TUN write failed: errno={Marshal.GetLastWin32Error()}");
-    }
-
-    public async ValueTask<int> ReadAsync(byte[] buffer, CancellationToken ct = default)
-    {
-        return await Task.Run(() => Read(buffer), ct).ConfigureAwait(false);
-    }
-
-    public async ValueTask WriteAsync(byte[] buffer, CancellationToken ct = default)
-    {
-        await Task.Run(() => Write(buffer), ct).ConfigureAwait(false);
     }
 
     public void Close()

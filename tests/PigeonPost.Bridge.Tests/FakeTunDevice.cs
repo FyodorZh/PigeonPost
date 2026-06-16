@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
 using PigeonPost.Tun;
 
 namespace PigeonPost.Bridge.Tests;
@@ -44,16 +43,6 @@ internal class FakeTunDevice : ITunDevice
     public void Write(byte[] buffer)
     {
         WrittenPackets.Add((byte[])buffer.Clone());
-    }
-
-    public ValueTask<int> ReadAsync(byte[] buffer, CancellationToken ct = default)
-    {
-        return new ValueTask<int>(Task.Run(() => Read(buffer), ct));
-    }
-
-    public ValueTask WriteAsync(byte[] buffer, CancellationToken ct = default)
-    {
-        return new ValueTask(Task.Run(() => Write(buffer), ct));
     }
 
     public void Close()
