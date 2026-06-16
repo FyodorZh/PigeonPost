@@ -20,31 +20,72 @@ services:
     networks:
       - pigeon-net
 
-  client:
-    build:
-      context: ../../..
-      dockerfile: docker/Dockerfile
-      additional_contexts:
-        - nugets=../../../nugets
-    image: pigeonpost:latest
-    container_name: pigeonpost-client
-    hostname: pigeonpost-client
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun
-    depends_on:
-      - server
+  client-1:
+    <<: &client-base
+      build:
+        context: ../../..
+        dockerfile: docker/Dockerfile
+        additional_contexts:
+          - nugets=../../../nugets
+      image: pigeonpost:latest
+      cap_add:
+        - NET_ADMIN
+      devices:
+        - /dev/net/tun
+      networks:
+        - pigeon-net
+    container_name: pigeonpost-client-1
+    hostname: pigeonpost-client-1
     environment:
       TUN_NAME: tun0
       TUN_IP: 10.0.0.2
       PEER_IP: 10.0.0.1
-    command: --role client --client-id pp-test-client --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
-    networks:
-      - pigeon-net
+    depends_on:
+      - server
+    command: --role client --client-id pp-test-client-1 --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
+
+  client-2:
+    <<: *client-base
+    container_name: pigeonpost-client-2
+    hostname: pigeonpost-client-2
+    environment:
+      TUN_NAME: tun0
+      TUN_IP: 10.0.0.6
+      PEER_IP: 10.0.0.1
+    depends_on:
+      - server
+    command: --role client --client-id pp-test-client-2 --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
+
+  client-3:
+    <<: *client-base
+    container_name: pigeonpost-client-3
+    hostname: pigeonpost-client-3
+    environment:
+      TUN_NAME: tun0
+      TUN_IP: 10.0.0.9
+      PEER_IP: 10.0.0.1
+    depends_on:
+      - server
+    command: --role client --client-id pp-test-client-3 --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
+
+  client-4:
+    <<: *client-base
+    container_name: pigeonpost-client-4
+    hostname: pigeonpost-client-4
+    environment:
+      TUN_NAME: tun0
+      TUN_IP: 10.0.0.13
+      PEER_IP: 10.0.0.1
+    depends_on:
+      - server
+    command: --role client --client-id pp-test-client-4 --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
 
   iperf-server:
-    image: networkstatic/iperf3
+    build:
+      context: .
+      dockerfile: Dockerfile.iperf
+    cap_add:
+      - NET_ADMIN
     network_mode: "service:server"
     depends_on:
       server:
@@ -53,17 +94,57 @@ services:
     volumes:
       - ./iperf-server.sh:/test/iperf-server.sh:ro
 
-  iperf-client:
-    image: networkstatic/iperf3
-    network_mode: "service:client"
+  iperf-client-1:
+    <<: &iperf-client-base
+      image: networkstatic/iperf3
+      entrypoint: ["/bin/sh", "/test/iperf-client.sh"]
+      volumes:
+        - ./iperf-client.sh:/test/iperf-client.sh:ro
+    environment:
+      IPERF_PORT: "5201"
+      TEST_MODE: "${TEST_MODE:-tcp}"
+    network_mode: "service:client-1"
     depends_on:
-      client:
-        condition: service_started
       iperf-server:
         condition: service_started
-    entrypoint: ["/bin/sh", "/test/iperf-client.sh"]
-    volumes:
-      - ./iperf-client.sh:/test/iperf-client.sh:ro
+      client-1:
+        condition: service_started
+
+  iperf-client-2:
+    <<: *iperf-client-base
+    environment:
+      IPERF_PORT: "5202"
+      TEST_MODE: "${TEST_MODE:-tcp}"
+    network_mode: "service:client-2"
+    depends_on:
+      iperf-server:
+        condition: service_started
+      client-2:
+        condition: service_started
+
+  iperf-client-3:
+    <<: *iperf-client-base
+    environment:
+      IPERF_PORT: "5203"
+      TEST_MODE: "${TEST_MODE:-tcp}"
+    network_mode: "service:client-3"
+    depends_on:
+      iperf-server:
+        condition: service_started
+      client-3:
+        condition: service_started
+
+  iperf-client-4:
+    <<: *iperf-client-base
+    environment:
+      IPERF_PORT: "5204"
+      TEST_MODE: "${TEST_MODE:-tcp}"
+    network_mode: "service:client-4"
+    depends_on:
+      iperf-server:
+        condition: service_started
+      client-4:
+        condition: service_started
 
 networks:
   pigeon-net:

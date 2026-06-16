@@ -14,7 +14,7 @@ fi
 echo "Bringing $TUN_NAME up"
 ip link set "$TUN_NAME" up
 
-if ! ip route show dev "$TUN_NAME" | grep -qF "$PEER_IP"; then
+if ! ip route get "$PEER_IP" 2>/dev/null | grep -qF "dev $TUN_NAME"; then
     echo "Adding route to peer $PEER_IP via $TUN_NAME"
     ip route add "$PEER_IP/32" dev "$TUN_NAME"
 fi
