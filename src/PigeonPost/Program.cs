@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Scriba;
-using Scriba.Consumers;
 
 namespace PigeonPost;
 
@@ -33,7 +33,7 @@ internal static class Program
         }
     }
 
-    static int Main(string[] args)
+    static async Task<int> Main(string[] args)
     {
         var config = CliParser.Parse(args, Console.Error);
         if (config == null)
@@ -64,7 +64,7 @@ internal static class Program
 
         try
         {
-            _app.RunAsync().GetAwaiter().GetResult();
+            await _app.RunAsync();
             return 0;
         }
         catch (Exception ex)
