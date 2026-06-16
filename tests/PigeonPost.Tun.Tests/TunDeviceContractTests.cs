@@ -3,44 +3,52 @@ using NUnit.Framework;
 namespace PigeonPost.Tun.Tests;
 
 [TestFixture]
+[Platform(Include = "Linux")]
 public class TunDeviceContractTests
 {
     [Test]
-    public void NewDevice_IsNotOpen()
+    [Category("Integration")]
+    public void Constructor_OpensDevice()
     {
-        using var device = new TunDevice();
-        Assert.That(device.IsOpen, Is.False);
-        Assert.That(device.Name, Is.EqualTo(string.Empty));
+        using var device = new TunDevice("tun99");
+        Assert.That(device.IsOpen, Is.True);
+        Assert.That(device.Name, Is.EqualTo("tun99"));
     }
 
     [Test]
-    public void Read_WhenNotOpen_ThrowsInvalidOperationException()
+    [Category("Integration")]
+    public void Close_IsIdempotent()
     {
-        using var device = new TunDevice();
+        var device = new TunDevice("tun99");
+        device.Close();
+        device.Close();
+        Assert.That(device.IsOpen, Is.False);
+    }
+
+    [Test]
+    [Category("Integration")]
+    public void Dispose_ClosesDevice()
+    {
+        var device = new TunDevice("tun99");
+        device.Dispose();
+        Assert.That(device.IsOpen, Is.False);
+    }
+
+    [Test]
+    [Category("Integration")]
+    public void Read_AfterClose_ThrowsInvalidOperationException()
+    {
+        using var device = new TunDevice("tun99");
+        device.Close();
         Assert.That(() => device.Read(new byte[1500]), Throws.InvalidOperationException);
     }
 
     [Test]
-    public void Write_WhenNotOpen_ThrowsInvalidOperationException()
+    [Category("Integration")]
+    public void Write_AfterClose_ThrowsInvalidOperationException()
     {
-        using var device = new TunDevice();
+        using var device = new TunDevice("tun99");
+        device.Close();
         Assert.That(() => device.Write(new byte[1500]), Throws.InvalidOperationException);
-    }
-
-    [Test]
-    public void Close_IsIdempotent()
-    {
-        var device = new TunDevice();
-        device.Close();
-        device.Close();
-        Assert.That(device.IsOpen, Is.False);
-    }
-
-    [Test]
-    public void Dispose_ClosesDevice()
-    {
-        var device = new TunDevice();
-        device.Dispose();
-        Assert.That(device.IsOpen, Is.False);
     }
 }

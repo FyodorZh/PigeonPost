@@ -39,10 +39,8 @@ public class DebugModeEndToEndTests
 
         StaticLogger.Instance.AddConsumer(new ConsoleConsumer());
 
-        _tunA = new TunDevice();
-        _tunB = new TunDevice();
-        _tunA.Open(TunAName);
-        _tunB.Open(TunBName);
+        _tunA = new TunDevice(TunAName);
+        _tunB = new TunDevice(TunBName);
 
         var bufferA = new PacketBuffer(100_000);
         var bufferB = new PacketBuffer(100_000);

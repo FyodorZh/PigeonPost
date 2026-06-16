@@ -15,8 +15,7 @@ public class TunDeviceIntegrationTests
     {
         if (!OperatingSystem.IsLinux()) Assert.Ignore("Requires Linux");
 
-        using var device = new TunDevice();
-        Assert.That(() => device.Open("tunA"), Throws.Nothing);
+        using var device = new TunDevice("tunA");
         Assert.That(device.IsOpen, Is.True);
         Assert.That(device.Name, Is.EqualTo("tunA"));
     }
@@ -26,8 +25,7 @@ public class TunDeviceIntegrationTests
     {
         if (!OperatingSystem.IsLinux()) Assert.Ignore("Requires Linux");
 
-        using var device = new TunDevice();
-        Assert.That(() => device.Open("nonexistent_tun_xyz"), Throws.InstanceOf<IOException>());
+        Assert.That(() => new TunDevice("nonexistent_tun_xyz"), Throws.InstanceOf<IOException>());
     }
 
     [Test]
@@ -35,12 +33,11 @@ public class TunDeviceIntegrationTests
     {
         if (!OperatingSystem.IsLinux()) Assert.Ignore("Requires Linux");
 
-        using var device = new TunDevice();
-        device.Open("tunA");
+        using var device = new TunDevice("tunA");
         device.Close();
         Assert.That(device.IsOpen, Is.False);
-        device.Open("tunA");
-        Assert.That(device.IsOpen, Is.True);
+        using var device2 = new TunDevice("tunA");
+        Assert.That(device2.IsOpen, Is.True);
     }
 
     [Test]
@@ -48,10 +45,8 @@ public class TunDeviceIntegrationTests
     {
         if (!OperatingSystem.IsLinux()) Assert.Ignore("Requires Linux");
 
-        using var tunA = new TunDevice();
-        using var tunB = new TunDevice();
-        tunA.Open("tunA");
-        tunB.Open("tunB");
+        using var tunA = new TunDevice("tunA");
+        using var tunB = new TunDevice("tunB");
 
         byte[] packet = PacketBuilder.BuildIcmpPacket(
             srcIp: "10.99.0.1",

@@ -89,10 +89,8 @@ public class ReconnectionTests
 
         string name = "reconn_e2e_" + Guid.NewGuid().ToString("N");
 
-        using var tunA = new TunDevice();
-        using var tunB = new TunDevice();
-        tunA.Open("tunA");
-        tunB.Open("tunB");
+        using var tunA = new TunDevice("tunA");
+        using var tunB = new TunDevice("tunB");
 
         var bufferA = new PacketBuffer(100_000);
         var bufferB = new PacketBuffer(100_000);

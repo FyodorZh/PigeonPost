@@ -6,16 +6,14 @@ namespace PigeonPost.Tun;
 
 public sealed class TunDevice : ITunDevice
 {
-    private int _fd = -1;
-    private string _name = string.Empty;
+    private int _fd;
+    private string _name;
 
     public string Name => _name;
     public bool IsOpen => _fd >= 0;
 
-    public void Open(string name)
+    public TunDevice(string name)
     {
-        if (IsOpen) throw new InvalidOperationException("TUN device already open.");
-
         string path = TunConstants.TunPath;
         int fd = NativeMethods.open(path, TunConstants.O_RDWR);
         if (fd < 0)

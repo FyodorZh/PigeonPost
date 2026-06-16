@@ -10,8 +10,7 @@ public class TunDeviceIntegrationTests
     [Platform(Include = "Linux")]
     public void Open_ValidTunDevice_Succeeds()
     {
-        using var device = new TunDevice();
-        Assert.That(() => device.Open("tun99"), Throws.Nothing);
+        using var device = new TunDevice("tun99");
         Assert.That(device.IsOpen, Is.True);
         Assert.That(device.Name, Is.EqualTo("tun99"));
     }

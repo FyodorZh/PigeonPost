@@ -60,8 +60,7 @@ internal sealed class App
     {
         var tunName = _config.TunNames[0];
 
-        using var tun = new TunDevice();
-        tun.Open(tunName);
+        using var tun = new TunDevice(tunName);
         tun.SetSendBufferSize(1048576);
         _logger.i($"TUN device '{tunName}' opened.");
 
@@ -126,8 +125,7 @@ internal sealed class App
 
         _logger.i($"Client ID: {clientId}, host IPv4: {FormatIp(hostIpv4)}");
 
-        using var tun = new TunDevice();
-        tun.Open(tunName);
+        using var tun = new TunDevice(tunName);
         tun.SetSendBufferSize(1048576);
         _logger.i($"TUN device '{tunName}' opened.");
 
@@ -198,8 +196,7 @@ internal sealed class App
         for (int i = 1; i < tunNames.Count; i++)
             clientTunNames.Add(tunNames[i]);
 
-        using var serverTun = new TunDevice();
-        serverTun.Open(serverTunName);
+        using var serverTun = new TunDevice(serverTunName);
         serverTun.SetSendBufferSize(1048576);
         _logger.i($"Server TUN '{serverTunName}' opened.");
 
@@ -218,8 +215,7 @@ internal sealed class App
             string clientTunName = clientTunNames[i];
             string debugClientId = $"debug-client-{i + 1}";
 
-            var clientTun = new TunDevice();
-            clientTun.Open(clientTunName);
+            var clientTun = new TunDevice(clientTunName);
             clientTun.SetSendBufferSize(1048576);
             clientTuns.Add(clientTun);
 

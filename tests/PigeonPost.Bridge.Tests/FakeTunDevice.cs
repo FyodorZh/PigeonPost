@@ -10,18 +10,18 @@ internal class FakeTunDevice : ITunDevice
     private readonly Queue<byte[]> _incoming = new();
     private readonly object _lock = new();
 
-    public string Name => "fake_tun";
+    public string Name { get; }
     public bool IsOpen { get; private set; } = true;
     public List<byte[]> WrittenPackets { get; } = new();
+
+    public FakeTunDevice(string name = "fake_tun")
+    {
+        Name = name;
+    }
 
     public void EnqueueIncoming(byte[] packet)
     {
         lock (_lock) _incoming.Enqueue(packet);
-    }
-
-    public void Open(string name)
-    {
-        IsOpen = true;
     }
 
     public int Read(byte[] buffer)
