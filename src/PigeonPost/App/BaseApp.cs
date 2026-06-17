@@ -20,7 +20,7 @@ internal abstract class BaseApp
     protected readonly ILogger _logger;
 
     protected volatile bool _shutdownRequested;
-    protected readonly CancellationTokenSource _cts = new();
+    private readonly CancellationTokenSource _cts = new();
 
     protected BaseApp(BridgeConfiguration config, ILogger logger)
     {
@@ -38,7 +38,7 @@ internal abstract class BaseApp
 
     public abstract Task RunAsync();
 
-    public void RequestShutdown()
+    public virtual void RequestShutdown()
     {
         _shutdownRequested = true;
         _cts.Cancel();

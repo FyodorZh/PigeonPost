@@ -13,10 +13,18 @@ namespace PigeonPost;
 
 internal sealed class ClientApp : BaseApp
 {
+    private readonly CancellationTokenSource _reconnectCts = new();
+
     public ClientApp(BridgeConfiguration config, ILogger logger) : base(config, logger)
     {
         if (config.Role != Role.Client)
             throw new ArgumentException("Role must be Client.", nameof(config));
+    }
+
+    public override void RequestShutdown()
+    {
+        _reconnectCts.Cancel();
+        base.RequestShutdown();
     }
 
     public override async Task RunAsync()
@@ -85,7 +93,7 @@ internal sealed class ClientApp : BaseApp
             _logger.i("Connection lost. Reconnecting in 1 second...");
             try
             {
-                await Task.Delay(1000, _cts.Token);
+                await Task.Delay(1000, _reconnectCts.Token);
             }
             catch (OperationCanceledException)
             {

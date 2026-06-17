@@ -62,7 +62,7 @@ internal sealed class DebugApp : BaseApp
 
             var clientSide = new ClientSideDebugLogic(
                 clientTun, clientId, clientIp, ServerIp,
-                clientUrl, _logger, _cts.Token, _clientTransportFactory,
+                clientUrl, _logger, _clientTransportFactory,
                 _config.BufferSizeBytes, _config.Verbose,
                 pending, harness.Network);
 
@@ -89,7 +89,10 @@ internal sealed class DebugApp : BaseApp
         if (_shutdownRequested)
         {
             foreach (var c in clientSides)
+            {
+                c.RequestShutdown();
                 c.Stop();
+            }
             await serverSide.Completion;
         }
 

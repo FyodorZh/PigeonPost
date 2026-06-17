@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Actuarius.Memory;
 using Pontifex;
@@ -17,7 +16,6 @@ public class ClientSideLogic
     protected readonly IPv4 _clientIp;
     protected readonly IPv4 _serverIp;
     protected readonly ILogger _logger;
-    protected readonly CancellationToken _externalCt;
 
     public event Action<ClientId>? Stopped;
 
@@ -29,7 +27,7 @@ public class ClientSideLogic
 
     private BridgeImpl? _bridge;
     private ITransport? _transport;
-    private bool _stopped;
+    private volatile bool _stopped;
 
     public ClientSideLogic(
         ITunDevice tun,
@@ -38,7 +36,6 @@ public class ClientSideLogic
         IPv4 serverIp,
         string clientUrl,
         ILogger logger,
-        CancellationToken externalCt,
         ITransportFactory transportFactory,
         int bufferSizeBytes,
         bool verbose)
@@ -49,31 +46,68 @@ public class ClientSideLogic
         _serverIp = serverIp;
         _clientUrl = clientUrl;
         _logger = logger;
-        _externalCt = externalCt;
         _transportFactory = transportFactory;
         _bufferSizeBytes = bufferSizeBytes;
         _verbose = verbose;
+    }
+
+    public virtual void RequestShutdown()
+    {
+        Stop();
     }
 
     public virtual Task Start()
     {
         var buffer = new PacketBuffer(_bufferSizeBytes);
         _bridge = new BridgeImpl(_tun, buffer, _logger, _verbose);
-
-        var handshake = new ClientHandshake(_clientId, _clientIp.Value);
-        var handler = new BridgeClientHandler(_bridge, handshake);
-
-        var transport = _transportFactory.Construct(_clientUrl, _logger, MemoryRental.Shared);
-        if (transport is not IAckRawClient ackClient)
-            throw new InvalidOperationException("Client transport is not an IAckRawClient.");
-
-        ackClient.Init(handler);
-        _transport = transport;
-
         _bridge.Start();
-        ackClient.Start(reason => _logger.i($"Client {_clientId} transport stopped: {reason.Type}"));
-        
+
+        _ = ReconnectLoopAsync();
+
         return Task.CompletedTask;
+    }
+
+    private async Task ReconnectLoopAsync()
+    {
+        while (!_stopped)
+        {
+            _logger.i($"Client {_clientId} connecting...");
+
+            var handshake = new ClientHandshake(_clientId, _clientIp.Value);
+            var handler = new BridgeClientHandler(_bridge!, handshake);
+
+            try
+            {
+                var transport = _transportFactory.Construct(_clientUrl, _logger, MemoryRental.Shared);
+                if (transport is not IAckRawClient ackClient)
+                {
+                    _logger.e($"Client {_clientId}: constructed transport is not IAckRawClient.");
+                    break;
+                }
+
+                ackClient.Init(handler);
+                _transport = transport;
+
+                var stoppedTcs = new TaskCompletionSource();
+                ackClient.Start(reason =>
+                {
+                    _logger.i($"Client {_clientId} transport stopped: {reason.Type}");
+                    stoppedTcs.TrySetResult();
+                });
+
+                await stoppedTcs.Task;
+            }
+            catch (Exception ex)
+            {
+                _logger.e($"Client {_clientId}: transport error: {ex.Message}");
+            }
+
+            if (_stopped)
+                break;
+
+            _logger.i("Connection lost. Reconnecting in 1 second...");
+            await Task.Delay(1000);
+        }
     }
 
     public void Stop()

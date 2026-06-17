@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using PigeonPost.Bridge;
 using PigeonPost.Tun;
@@ -16,6 +15,7 @@ public sealed class ClientSideDebugLogic : ClientSideLogic
 
     private readonly Queue<byte[]> _pending;
     private readonly VirtualNetwork _network;
+    private volatile bool _shutdownRequested;
 
     public ClientSideDebugLogic(
         ITunDevice tun,
@@ -24,17 +24,21 @@ public sealed class ClientSideDebugLogic : ClientSideLogic
         IPv4 serverIp,
         string clientUrl,
         ILogger logger,
-        CancellationToken externalCt,
         Pontifex.ITransportFactory transportFactory,
         int bufferSizeBytes,
         bool verbose,
         Queue<byte[]> pending,
         VirtualNetwork network)
-        : base(tun, clientId, clientIp, serverIp, clientUrl, logger, externalCt,
+        : base(tun, clientId, clientIp, serverIp, clientUrl, logger,
                transportFactory, bufferSizeBytes, verbose)
     {
         _pending = pending;
         _network = network;
+    }
+
+    public override void RequestShutdown()
+    {
+        _shutdownRequested = true;
     }
 
     public override async Task Start()
@@ -45,7 +49,10 @@ public sealed class ClientSideDebugLogic : ClientSideLogic
         {
             for (int seq = 0; seq < MessagesPerClient; seq++)
             {
-                await Task.Delay(PeriodBetweenMessages, _externalCt);
+                if (_shutdownRequested)
+                    return;
+
+                await Task.Delay(PeriodBetweenMessages);
 
                 int size = Random.Shared.Next(1, 1025);
                 byte[] msg = new byte[size];
@@ -57,24 +64,19 @@ public sealed class ClientSideDebugLogic : ClientSideLogic
                 _network.SendFromTo(_clientIp, _serverIp, msg);
             }
 
-            while (true)
+            while (!_shutdownRequested)
             {
-                if (_externalCt.IsCancellationRequested)
-                    return;
-
                 lock (_pending)
                 {
                     if (_pending.Count == 0)
                         break;
                 }
 
-                await Task.Delay(10, _externalCt);
+                await Task.Delay(10);
             }
 
-            _logger.i($"Client {_clientId} completed: all {MessagesPerClient} messages sent and verified.");
-        }
-        catch (OperationCanceledException)
-        {
+            if (!_shutdownRequested)
+                _logger.i($"Client {_clientId} completed: all {MessagesPerClient} messages sent and verified.");
         }
         finally
         {
