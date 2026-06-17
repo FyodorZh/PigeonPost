@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using PigeonPost.Bridge;
+using PigeonPost.Tun;
 using Scriba;
 using Scriba.Consumers;
 
@@ -27,7 +28,7 @@ public class ServerHubRealValidationTests
     [Test]
     public void ClientPacket_SourceEqualsAdvertisedIp_Accepted()
     {
-        var handshake = new ClientHandshake(new ClientId("client-a"), 0xC0A80101);
+        var handshake = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
         _hub.TryRegisterSession(handshake, out _);
 
         byte[] packet = BuildIpv4Packet(source: 0xC0A80101, dest: 0x0A000001);
@@ -41,7 +42,7 @@ public class ServerHubRealValidationTests
     [Test]
     public void ClientPacket_SourceDiffersFromAdvertisedIp_Dropped()
     {
-        var handshake = new ClientHandshake(new ClientId("client-a"), 0xC0A80101);
+        var handshake = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
         _hub.TryRegisterSession(handshake, out _);
 
         byte[] packet = BuildIpv4Packet(source: 0xC0A80199, dest: 0x0A000001);
@@ -54,7 +55,7 @@ public class ServerHubRealValidationTests
     [Test]
     public void ClientPacket_MalformedIpv4_Dropped()
     {
-        var handshake = new ClientHandshake(new ClientId("client-a"), 0xC0A80101);
+        var handshake = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
         _hub.TryRegisterSession(handshake, out _);
 
         byte[] packet = new byte[] { 0x45, 0x00 };
@@ -67,7 +68,7 @@ public class ServerHubRealValidationTests
     [Test]
     public void ClientPacket_NonIpv4_Dropped()
     {
-        var handshake = new ClientHandshake(new ClientId("client-a"), 0xC0A80101);
+        var handshake = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
         _hub.TryRegisterSession(handshake, out _);
 
         byte[] packet = new byte[20];
@@ -82,9 +83,9 @@ public class ServerHubRealValidationTests
     public void MultipleClients_EachValidatedSeparately()
     {
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), 0xC0A80101), out _);
+            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-b"), 0xC0A80102), out _);
+            new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102), out _);
 
         byte[] validA = BuildIpv4Packet(source: 0xC0A80101, dest: 0x0A000001);
         byte[] spoofedB = BuildIpv4Packet(source: 0xC0A80199, dest: 0x0A000002);

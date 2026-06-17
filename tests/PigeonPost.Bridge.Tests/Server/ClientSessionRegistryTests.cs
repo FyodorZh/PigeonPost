@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using PigeonPost.Bridge;
+using PigeonPost.Tun;
 
 namespace PigeonPost.Bridge.Tests.Server;
 
@@ -17,8 +18,8 @@ public class ClientSessionRegistryTests
     [Test]
     public void Register_TwoDistinctClients_BothAccepted()
     {
-        var h1 = new ClientHandshake(new ClientId("client-a"), 0xC0A80101);
-        var h2 = new ClientHandshake(new ClientId("client-b"), 0xC0A80102);
+        var h1 = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
+        var h2 = new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102);
 
         Assert.That(_hub.TryRegisterSession(h1, out var s1), Is.EqualTo(SessionRegistrationResult.Accepted));
         Assert.That(s1, Is.Not.Null);
@@ -31,8 +32,8 @@ public class ClientSessionRegistryTests
     [Test]
     public void Register_DuplicateClientId_Rejected()
     {
-        var h1 = new ClientHandshake(new ClientId("client-a"), 0xC0A80101);
-        var h2 = new ClientHandshake(new ClientId("client-a"), 0xC0A80102);
+        var h1 = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
+        var h2 = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80102);
 
         Assert.That(_hub.TryRegisterSession(h1, out var s1), Is.EqualTo(SessionRegistrationResult.Accepted));
         Assert.That(s1, Is.Not.Null);
@@ -44,8 +45,8 @@ public class ClientSessionRegistryTests
     [Test]
     public void Register_DuplicateHostIp_Rejected()
     {
-        var h1 = new ClientHandshake(new ClientId("client-a"), 0xC0A80101);
-        var h2 = new ClientHandshake(new ClientId("client-b"), 0xC0A80101);
+        var h1 = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
+        var h2 = new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80101);
 
         Assert.That(_hub.TryRegisterSession(h1, out var s1), Is.EqualTo(SessionRegistrationResult.Accepted));
         Assert.That(s1, Is.Not.Null);
@@ -57,8 +58,8 @@ public class ClientSessionRegistryTests
     [Test]
     public void RemoveSession_OnlyRemovesTargetClient()
     {
-        var h1 = new ClientHandshake(new ClientId("client-a"), 0xC0A80101);
-        var h2 = new ClientHandshake(new ClientId("client-b"), 0xC0A80102);
+        var h1 = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
+        var h2 = new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102);
 
         _hub.TryRegisterSession(h1, out _);
         _hub.TryRegisterSession(h2, out _);
@@ -71,26 +72,26 @@ public class ClientSessionRegistryTests
     [Test]
     public void RemoveSession_KeepsOtherClientsActive()
     {
-        var h1 = new ClientHandshake(new ClientId("client-a"), 0xC0A80101);
-        var h2 = new ClientHandshake(new ClientId("client-b"), 0xC0A80102);
+        var h1 = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
+        var h2 = new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102);
 
         _hub.TryRegisterSession(h1, out _);
         _hub.TryRegisterSession(h2, out _);
 
         _hub.RemoveSession(new ClientId("client-a"));
 
-        _hub.TryRegisterSession(new ClientHandshake(new ClientId("client-c"), 0xC0A80103), out _);
+        _hub.TryRegisterSession(new ClientHandshake(new ClientId("client-c"), (IPv4)0xC0A80103), out _);
         Assert.That(_hub.ActiveSessionCount, Is.EqualTo(2));
     }
 
     [Test]
     public void Reconnect_WithSameId_AfterRemoval_Succeeds()
     {
-        _hub.TryRegisterSession(new ClientHandshake(new ClientId("client-a"), 0xC0A80101), out _);
+        _hub.TryRegisterSession(new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
         _hub.RemoveSession(new ClientId("client-a"));
         Assert.That(_hub.ActiveSessionCount, Is.EqualTo(0));
 
-        var h = new ClientHandshake(new ClientId("client-a"), 0xC0A80101);
+        var h = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
         Assert.That(_hub.TryRegisterSession(h, out var s), Is.EqualTo(SessionRegistrationResult.Accepted));
         Assert.That(s, Is.Not.Null);
         Assert.That(_hub.ActiveSessionCount, Is.EqualTo(1));

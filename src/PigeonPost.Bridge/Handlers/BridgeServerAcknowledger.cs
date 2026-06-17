@@ -1,6 +1,5 @@
 using Actuarius.Memory;
 using Pontifex.Abstractions.Acknowledgers;
-using Pontifex.Abstractions.Handlers.Server;
 using Pontifex.Utils;
 
 namespace PigeonPost.Bridge;
@@ -18,10 +17,18 @@ internal sealed class BridgeServerAcknowledger : IRawServerAcknowledger<BridgeSe
     {
         ClientHandshake? handshake = null;
         HandshakeRejectCode rejectCode = HandshakeRejectCode.InvalidHandshake;
+        
+        using var disposer = ackData.AsDisposable();
 
-        if (ackData.TryPopFirst(out IMultiRefReadOnlyByteArray? data) && data != null)
+        if (ackData.TryPopFirst(out IMultiRefReadOnlyByteArray? data))
         {
-            byte[] handshakeBytes = PontifexPacketConverter.ExtractPacket(data);
+            byte[]? handshakeBytes = data.ToArray();
+            data.Release();
+            if (handshakeBytes == null)
+            {
+                return new BridgeServerHandler(_hub, null, rejectCode);
+            }
+            
             handshake = HandshakeCodec.DecodeRequest(handshakeBytes);
         }
 

@@ -4,6 +4,7 @@ using NUnit.Framework;
 using Pontifex;
 using Pontifex.Transports.Direct;
 using PigeonPost.Bridge;
+using PigeonPost.Tun;
 using Scriba;
 using Scriba.Consumers;
 
@@ -32,12 +33,12 @@ public class MultiClientDirectTransportTests
         var bridge1 = new FakeBridge();
         var client1 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         client1.Init(new BridgeClientHandler(bridge1,
-            new ClientHandshake(new ClientId("client-1"), 0xC0A80101)));
+            new ClientHandshake(new ClientId("client-1"), (IPv4)0xC0A80101)));
 
         var bridge2 = new FakeBridge();
         var client2 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         client2.Init(new BridgeClientHandler(bridge2,
-            new ClientHandshake(new ClientId("client-2"), 0xC0A80102)));
+            new ClientHandshake(new ClientId("client-2"), (IPv4)0xC0A80102)));
 
         var cs1 = new ManualResetEventSlim(false);
         var cs2 = new ManualResetEventSlim(false);
@@ -66,12 +67,12 @@ public class MultiClientDirectTransportTests
         var bridge1 = new FakeBridge();
         var client1 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         client1.Init(new BridgeClientHandler(bridge1,
-            new ClientHandshake(new ClientId("dup-id"), 0xC0A80101)));
+            new ClientHandshake(new ClientId("dup-id"), (IPv4)0xC0A80101)));
 
         var bridge2 = new FakeBridge();
         var client2 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         client2.Init(new BridgeClientHandler(bridge2,
-            new ClientHandshake(new ClientId("dup-id"), 0xC0A80102)));
+            new ClientHandshake(new ClientId("dup-id"), (IPv4)0xC0A80102)));
 
         var cs1 = new ManualResetEventSlim(false);
         var cs2 = new ManualResetEventSlim(false);
@@ -99,12 +100,12 @@ public class MultiClientDirectTransportTests
         var bridge1 = new FakeBridge();
         var client1 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         client1.Init(new BridgeClientHandler(bridge1,
-            new ClientHandshake(new ClientId("client-1"), 0xC0A80101)));
+            new ClientHandshake(new ClientId("client-1"), (IPv4)0xC0A80101)));
 
         var bridge2 = new FakeBridge();
         var client2 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         client2.Init(new BridgeClientHandler(bridge2,
-            new ClientHandshake(new ClientId("client-2"), 0xC0A80102)));
+            new ClientHandshake(new ClientId("client-2"), (IPv4)0xC0A80102)));
 
         var cs1 = new ManualResetEventSlim(false);
         var cs2 = new ManualResetEventSlim(false);
@@ -137,12 +138,12 @@ public class MultiClientDirectTransportTests
         var bridge1 = new FakeBridge();
         var client1 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         client1.Init(new BridgeClientHandler(bridge1,
-            new ClientHandshake(new ClientId("client-a"), 0xC0A80101)));
+            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101)));
 
         var bridge2 = new FakeBridge();
         var client2 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         client2.Init(new BridgeClientHandler(bridge2,
-            new ClientHandshake(new ClientId("client-b"), 0xC0A80102)));
+            new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102)));
 
         var cs1 = new ManualResetEventSlim(false);
         var cs2 = new ManualResetEventSlim(false);

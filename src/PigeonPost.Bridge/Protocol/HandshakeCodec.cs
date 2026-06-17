@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using PigeonPost.Tun;
 
 namespace PigeonPost.Bridge;
 
@@ -24,7 +25,7 @@ public static class HandshakeCodec
 
         Buffer.BlockCopy(clientIdBytes, 0, buffer, Magic.Length + 1, clientIdBytes.Length);
 
-        uint ipv4 = handshake.AdvertisedHostIpv4;
+        uint ipv4 = handshake.AdvertisedHostIpv4.Value;
         int ipOffset = Magic.Length + 1 + clientIdBytes.Length;
         buffer[ipOffset] = (byte)(ipv4 >> 24);
         buffer[ipOffset + 1] = (byte)(ipv4 >> 16);
@@ -65,7 +66,7 @@ public static class HandshakeCodec
                   | ((uint)buffer[ipOffset + 2] << 8)
                   | buffer[ipOffset + 3];
 
-        return new ClientHandshake(new ClientId(clientIdStr), ipv4);
+        return new ClientHandshake(new ClientId(clientIdStr), new IPv4(ipv4));
     }
 
     public static byte[] EncodeAck(HandshakeAck ack)

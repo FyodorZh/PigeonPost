@@ -13,7 +13,7 @@ public class ServerHub : IServerHub, IDisposable
 {
     private readonly object _lock = new();
     private readonly Dictionary<ClientId, ClientSession> _sessionsByClientId = new();
-    private readonly Dictionary<uint, ClientId> _clientIdByHostIp = new();
+    private readonly Dictionary<IPv4, ClientId> _clientIdByHostIp = new();
     private readonly ILogger _logger;
     private readonly ITunDevice? _tun;
 
@@ -106,7 +106,7 @@ public class ServerHub : IServerHub, IDisposable
         string? targetClientId;
         lock (_lock)
         {
-            if (!_clientIdByHostIp.TryGetValue(info.DestinationAddress, out var clientId)
+            if (!_clientIdByHostIp.TryGetValue((IPv4)info.DestinationAddress, out var clientId)
                 || !_sessionsByClientId.TryGetValue(clientId, out var clientSession))
             {
                 targetClientId = null;
@@ -152,7 +152,7 @@ public class ServerHub : IServerHub, IDisposable
             if (info.SourceAddress != session.AdvertisedHostIpv4)
             {
                 DroppedInvalidSource++;
-                _logger.w($"Invalid source IP from clientId={clientId.Value}: expected={FormatIp(session.AdvertisedHostIpv4)}, got={FormatIp(info.SourceAddress)}");
+                _logger.w($"Invalid source IP from clientId={clientId.Value}: expected={FormatIp(session.AdvertisedHostIpv4)}, got={FormatIp((IPv4)info.SourceAddress)}");
                 return;
             }
         }
@@ -206,10 +206,7 @@ public class ServerHub : IServerHub, IDisposable
         }
     }
 
-    private static string FormatIp(uint ip)
-    {
-        return $"{(ip >> 24) & 0xFF}.{(ip >> 16) & 0xFF}.{(ip >> 8) & 0xFF}.{ip & 0xFF}";
-    }
+    private static string FormatIp(IPv4 ip) => ip.ToString();
 
     private sealed class PendingEndpoint : IAckRawBaseEndpoint
     {

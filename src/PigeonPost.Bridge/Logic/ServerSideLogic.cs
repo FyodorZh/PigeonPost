@@ -1,14 +1,12 @@
 using System;
-using Actuarius.Collections;
 using Actuarius.Memory;
 using Pontifex;
 using Pontifex.Abstractions;
 using Pontifex.Abstractions.Servers;
-using PigeonPost.Bridge;
 using PigeonPost.Tun;
 using Scriba;
 
-namespace PigeonPost;
+namespace PigeonPost.Bridge;
 
 public sealed class ServerSideLogic
 {

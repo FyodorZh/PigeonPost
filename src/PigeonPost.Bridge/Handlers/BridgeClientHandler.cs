@@ -19,16 +19,21 @@ internal sealed class BridgeClientHandler : IAckRawClientHandler
 
     public void OnConnected(IAckRawServerEndpoint endPoint, UnionDataList ackResponse)
     {
-        if (ackResponse.TryPopFirst(out IMultiRefReadOnlyByteArray? ackData) && ackData != null)
+        using var disposer = ackResponse.AsDisposable();
+        if (ackResponse.TryPopFirst(out IMultiRefReadOnlyByteArray? ackData))
         {
-            byte[] ackBytes = PontifexPacketConverter.ExtractPacket(ackData);
-            var ack = HandshakeCodec.DecodeAck(ackBytes);
-            if (ack != null && ack.Status == HandshakeAckStatus.Rejected)
+            byte[]? ackBytes = ackData.ToArray();
+            ackData.Release();
+            if (ackBytes != null)
             {
-                _bridge.OnTransportStopped(new Pontifex.StopReasons.ExceptionFail(
-                    "handshake", new System.InvalidOperationException($"Handshake rejected: {ack.RejectCode}"),
-                    $"Handshake rejected: {ack.RejectCode}"));
-                return;
+                var ack = HandshakeCodec.DecodeAck(ackBytes);
+                if (ack is { Status: HandshakeAckStatus.Rejected })
+                {
+                    _bridge.OnTransportStopped(new Pontifex.StopReasons.ExceptionFail(
+                        "handshake", new System.InvalidOperationException($"Handshake rejected: {ack.RejectCode}"),
+                        $"Handshake rejected: {ack.RejectCode}"));
+                    return;
+                }
             }
         }
 
@@ -41,8 +46,12 @@ internal sealed class BridgeClientHandler : IAckRawClientHandler
 
         if (receivedBuffer.TryPopFirst(out IMultiRefReadOnlyByteArray? data))
         {
-            byte[] packet = PontifexPacketConverter.ExtractPacket(data);
-            _bridge.OnPacketReceived(packet);
+            byte[]? packet = data.ToArray();
+            data.Release();
+            if (packet != null)
+            {
+                _bridge.OnPacketReceived(packet);
+            }
         }
     }
 

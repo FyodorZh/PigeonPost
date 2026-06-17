@@ -1,16 +1,17 @@
 using System;
 using Pontifex.Abstractions.Endpoints;
+using PigeonPost.Tun;
 
 namespace PigeonPost.Bridge;
 
 public sealed class ClientSession
 {
     public ClientId ClientId { get; }
-    public uint AdvertisedHostIpv4 { get; }
+    public IPv4 AdvertisedHostIpv4 { get; }
     public IAckRawBaseEndpoint Endpoint { get; }
     public DateTime ConnectedAt { get; }
 
-    public ClientSession(ClientId clientId, uint advertisedHostIpv4, IAckRawBaseEndpoint endpoint)
+    public ClientSession(ClientId clientId, IPv4 advertisedHostIpv4, IAckRawBaseEndpoint endpoint)
     {
         ClientId = clientId ?? throw new ArgumentNullException(nameof(clientId));
         AdvertisedHostIpv4 = advertisedHostIpv4;
