@@ -12,6 +12,7 @@ using Pontifex.Transports.Direct;
 using Pontifex.Transports.Tcp;
 using PigeonPost.Bridge;
 using PigeonPost.Tun;
+using PigeonPost.Tun.Virtual;
 using Scriba;
 
 namespace PigeonPost;
@@ -185,96 +186,89 @@ internal sealed class App
     private async Task RunDebugAsync()
     {
         int clientCount = _config.DebugClientCount;
-        var tunNames = _config.TunNames;
+        string serverUrl = _config.DebugServerUrl;
+        string clientUrl = _config.DebugClientUrl;
 
-        string serverTunName = tunNames[0];
-        var clientTunNames = new List<string>();
-        for (int i = 1; i < tunNames.Count; i++)
-            clientTunNames.Add(tunNames[i]);
+        var network = new VirtualNetwork();
+        var debugTopology = new DebugNetworkTopology(
+            network,
+            clientCount,
+            messagesPerClient: 100,
+            periodBetweenMessages: TimeSpan.FromMilliseconds(10));
 
-        using var serverTun = new TunDevice(serverTunName);
-        serverTun.SetSendBufferSize(1048576);
-        _logger.i($"Server TUN '{serverTunName}' opened.");
+        var serverTun = debugTopology.ServerDevice;
+        var clientTuns = debugTopology.ClientDevices;
 
         var serverHub = new ServerHub(_logger, serverTun);
         var serverBuffer = new PacketBuffer(_config.BufferSizeBytes);
         using var serverBridge = new BridgeImpl(serverTun, serverBuffer, _logger, _config.Verbose);
         serverBridge.SetPacketHandler(packet => serverHub.OnPacketFromTun(packet));
 
+        var serverTransport = CreateTransport(serverUrl, isServer: true);
+        if (serverTransport is not IAckRawServer ackServer)
+            throw new InvalidOperationException("Server transport is not an IAckRawServer.");
+
+        ackServer.Init(new BridgeServerAcknowledger(serverHub));
+
         var clientBridges = new List<BridgeImpl>();
-        var clientTuns = new List<TunDevice>();
-        var clientHandlers = new List<BridgeClientHandler>();
-        var clientTransports = new List<AckRawDirectClient>();
+        var clientTransports = new List<ITransport>();
 
         for (int i = 0; i < clientCount; i++)
         {
-            string clientTunName = clientTunNames[i];
             string debugClientId = $"debug-client-{i + 1}";
 
-            var clientTun = new TunDevice(clientTunName);
-            clientTun.SetSendBufferSize(1048576);
-            clientTuns.Add(clientTun);
+            uint clientIpv4 = (uint)(new IPv4(192, 168, 0, 2).Value + (uint)i);
 
-            uint clientIpv4;
-            try
-            {
-                clientIpv4 = TunIpv4AddressResolver.ResolveIpv4Address(clientTunName);
-            }
-            catch (Exception ex)
-            {
-                _logger.e($"Failed to resolve TUN IPv4 for '{clientTunName}': {ex.Message}");
-                return;
-            }
-
-            _logger.i($"Debug client '{debugClientId}': TUN={clientTunName}, host={FormatIp(clientIpv4)}");
+            _logger.i($"Debug client '{debugClientId}': virtual IP={FormatIp(clientIpv4)}");
 
             var clientBuffer = new PacketBuffer(_config.BufferSizeBytes);
-            var clientBridge = new BridgeImpl(clientTun, clientBuffer, _logger, _config.Verbose);
+            var clientBridge = new BridgeImpl(clientTuns[i], clientBuffer, _logger, _config.Verbose);
             clientBridges.Add(clientBridge);
 
             var handshake = new ClientHandshake(new ClientId(debugClientId), clientIpv4);
-            clientHandlers.Add(new BridgeClientHandler(clientBridge, handshake));
+            var clientHandler = new BridgeClientHandler(clientBridge, handshake);
 
-            var clientTransport = new AckRawDirectClient(ExtractDirectServerName(_config.PontifexUrl),
-                _logger, MemoryRental.Shared);
+            var clientTransport = CreateTransport(clientUrl, isServer: false);
+            if (clientTransport is not IAckRawClient ackClient)
+                throw new InvalidOperationException("Client transport is not an IAckRawClient.");
+
+            ackClient.Init(clientHandler);
             clientTransports.Add(clientTransport);
         }
 
-        var serverNameActual = ExtractDirectServerName(_config.PontifexUrl);
-        var server = new AckRawDirectServer(serverNameActual, _logger, MemoryRental.Shared);
-        server.Init(new BridgeServerAcknowledger(serverHub));
-
-        server.Start(reason => _logger.i($"Debug server stopped: {reason.Type}"));
+        ackServer.Start(reason => _logger.i($"Debug server stopped: {reason.Type}"));
         serverBridge.Start();
 
         for (int i = 0; i < clientCount; i++)
         {
-            var clientTransport = clientTransports[i];
-            clientTransport.Init(clientHandlers[i]);
-            int idx = i;
-            clientTransport.Start(reason => _logger.i($"Debug client {idx + 1} stopped: {reason.Type}"));
+            if (clientTransports[i] is IAckRawClient ackClient)
+            {
+                int idx = i;
+                ackClient.Start(reason => _logger.i($"Debug client {idx + 1} stopped: {reason.Type}"));
+            }
             clientBridges[i].Start();
         }
 
-        _logger.i($"Debug mode running: {serverTunName} ←→ {clientCount} client(s)");
+        _logger.i($"Debug mode running: {clientCount} virtual client(s), server={serverUrl}");
 
-        await WaitForShutdownAsync();
+        await Task.WhenAny(
+            debugTopology.WaitForCompletionAsync(),
+            WaitForShutdownAsync());
 
         _logger.i("Shutting down debug mode...");
 
-        foreach (var clientTransport in clientTransports)
-            clientTransport.Stop(Pontifex.StopReason.UserIntention);
+        debugTopology.Stop();
 
-        foreach (var clientBridge in clientBridges)
-            clientBridge.Stop(Pontifex.StopReason.UserIntention);
+        foreach (var t in clientTransports)
+            if (t is IAckRawClient c) c.Stop(Pontifex.StopReason.UserIntention);
 
-        foreach (var clientTun in clientTuns)
-            clientTun.Close();
+        foreach (var b in clientBridges)
+            b.Stop(Pontifex.StopReason.UserIntention);
 
         serverHub.StopAccepting();
         serverHub.StopAll(Pontifex.StopReason.UserIntention);
         serverBridge.Stop(Pontifex.StopReason.UserIntention);
-        serverTun.Close();
+        ackServer.Stop(Pontifex.StopReason.UserIntention);
 
         _logger.i("Debug instance shut down.");
     }

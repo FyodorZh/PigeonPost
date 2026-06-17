@@ -15,6 +15,9 @@ public class DebugNetworkTopology
     private static readonly IPv4 ServerIp = new IPv4(192, 168, 0, 1);
     private static readonly IPv4 ClientBaseIp = new IPv4(192, 168, 0, 2);
 
+    public ITunDevice ServerDevice { get; }
+    public IReadOnlyList<ITunDevice> ClientDevices { get; }
+
     public DebugNetworkTopology(
         VirtualNetwork network,
         int clientCount,
@@ -27,7 +30,9 @@ public class DebugNetworkTopology
         int totalExpected = clientCount * messagesPerClient;
         int totalVerified = 0;
 
-        network.CreateNode("server", ServerIp, (fromIp, toIp, packet) =>
+        var clientDevices = new List<ITunDevice>();
+
+        ServerDevice = network.CreateNode("server", ServerIp, (fromIp, toIp, packet) =>
         {
             byte[] response = new byte[packet.Length];
             for (int i = 0; i < packet.Length; i++)
@@ -42,7 +47,7 @@ public class DebugNetworkTopology
             string name = $"client{i}";
             var pending = new Queue<byte[]>();
 
-            network.CreateNode(name, clientIp, (fromIp, toIp, packet) =>
+            var device = network.CreateNode(name, clientIp, (fromIp, toIp, packet) =>
             {
                 byte[] expected;
                 lock (pending)
@@ -59,6 +64,8 @@ public class DebugNetworkTopology
                 if (Interlocked.Increment(ref totalVerified) == totalExpected)
                     tcs.TrySetResult();
             });
+
+            clientDevices.Add(device);
 
             int idx = i;
             _ = Task.Run(async () =>
@@ -85,6 +92,7 @@ public class DebugNetworkTopology
             });
         }
 
+        ClientDevices = clientDevices.AsReadOnly();
         _networkTask = network.RunAsync(_cts.Token);
         _completionTask = tcs.Task;
     }

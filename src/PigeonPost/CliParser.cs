@@ -16,6 +16,8 @@ internal static class CliParser
         bool verbose = false;
         string? clientId = null;
         int debugClientCount = 1;
+        string? debugServerUrl = null;
+        string? debugClientUrl = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -52,6 +54,14 @@ internal static class CliParser
                     if (!int.TryParse(args[i], NumberStyles.None, CultureInfo.InvariantCulture, out debugClientCount))
                         { PrintError(errorWriter, $"Invalid debug-clients: '{args[i]}'."); return null; }
                     break;
+                case "--debug-server-url":
+                    if (++i >= args.Length) { PrintError(errorWriter, "Missing value for --debug-server-url."); return null; }
+                    debugServerUrl = args[i];
+                    break;
+                case "--debug-client-url":
+                    if (++i >= args.Length) { PrintError(errorWriter, "Missing value for --debug-client-url."); return null; }
+                    debugClientUrl = args[i];
+                    break;
                 case "--help" or "-h" or "/help":
                     PrintHelp(errorWriter);
                     return null;
@@ -61,26 +71,13 @@ internal static class CliParser
             }
         }
 
-        if (!Validate(role, tunNames, url, bufferSize, clientId, debugClientCount, errorWriter))
+        if (!Validate(role, tunNames, url, bufferSize, clientId, debugClientCount, debugServerUrl, debugClientUrl, errorWriter))
             return null;
 
         if (role == Role.Debug)
         {
-            int needed = debugClientCount;
-            if (tunNames.Count == 0)
-            {
-                tunNames.Add("tunServer");
-                for (int n = 1; n <= needed; n++)
-                    tunNames.Add($"tunClient{n}");
-            }
-            else if (tunNames.Count == 1 && needed == 1)
-            {
-                tunNames.Add("tunB");
-            }
-            else if (tunNames.Count == needed)
-            {
-                tunNames.Insert(0, "tunServer");
-            }
+            debugServerUrl ??= "tcp|127.0.0.1:12345";
+            debugClientUrl ??= debugServerUrl;
         }
 
         return new BridgeConfiguration
@@ -91,15 +88,23 @@ internal static class CliParser
             BufferSizeBytes = bufferSize,
             Verbose = verbose,
             ClientId = clientId,
-            DebugClientCount = debugClientCount
+            DebugClientCount = debugClientCount,
+            DebugServerUrl = debugServerUrl ?? "tcp|127.0.0.1:12345",
+            DebugClientUrl = debugClientUrl ?? debugServerUrl ?? "tcp|127.0.0.1:12345"
         };
     }
 
     private static bool Validate(Role? role, List<string> tunNames, string? url,
-        int bufferSize, string? clientId, int debugClientCount, TextWriter errorWriter)
+        int bufferSize, string? clientId, int debugClientCount,
+        string? debugServerUrl, string? debugClientUrl, TextWriter errorWriter)
     {
         if (role == null) { PrintError(errorWriter, "--role is required."); return false; }
-        if (url == null) { PrintError(errorWriter, "--url is required."); return false; }
+
+        if (role != Role.Debug && url == null)
+        {
+            PrintError(errorWriter, "--url is required for this role.");
+            return false;
+        }
 
         if (role == Role.Client && string.IsNullOrEmpty(clientId))
         {
@@ -152,7 +157,8 @@ internal static class CliParser
         w.WriteLine("SYNOPSIS");
         w.WriteLine("    PigeonPost --role <server|client|debug> --tun <name>");
         w.WriteLine("              [--tun <name2>] --url <url> [--client-id <id>]");
-        w.WriteLine("              [--debug-clients <N>] [options]");
+        w.WriteLine("              [--debug-clients <N>] [--debug-server-url <url>]");
+        w.WriteLine("              [--debug-client-url <url>] [options]");
         w.WriteLine();
         w.WriteLine("DESCRIPTION");
         w.WriteLine("    PigeonPost bridges TUN virtual network devices over a Pontifex");
@@ -168,11 +174,12 @@ internal static class CliParser
         w.WriteLine("              Requires --client-id. Automatically reconnects on");
         w.WriteLine("              disconnect.");
         w.WriteLine("    debug     Single-process mode running one server and N clients with");
-        w.WriteLine("              N+1 TUN devices using in-process Pontifex transport.");
-        w.WriteLine("              Control with --debug-clients (default 1).");
+        w.WriteLine("              virtual TUN devices. Tests transport connectivity using");
+        w.WriteLine("              --debug-server-url and --debug-client-url.");
         w.WriteLine();
-        w.WriteLine("    PigeonPost opens existing TUN devices. It does not create or configure");
-        w.WriteLine("    them. IP addresses and routes must be set up externally.");
+        w.WriteLine("    PigeonPost opens existing TUN devices for server/client roles. It");
+        w.WriteLine("    does not create or configure them. IP addresses and routes must be");
+        w.WriteLine("    set up externally.");
         w.WriteLine();
         w.WriteLine("OPTIONS");
         w.WriteLine("    -r, --role <role>");
@@ -180,14 +187,12 @@ internal static class CliParser
         w.WriteLine();
         w.WriteLine("    -t, --tun <name>");
         w.WriteLine("        TUN device name (e.g. tun0). Repeatable. Provide once for");
-        w.WriteLine("        server/client roles. In debug mode, auto-generated or explicitly");
-        w.WriteLine("        specified (server first, then clients).");
+        w.WriteLine("        server/client roles.");
         w.WriteLine();
         w.WriteLine("    -u, --url <url>");
-        w.WriteLine("        Required. Pontifex transport URL. Must be quoted to protect the");
-        w.WriteLine("        '|' character from the shell. Examples:");
+        w.WriteLine("        Pontifex transport URL for server/client roles. Must be quoted");
+        w.WriteLine("        to protect the '|' character from the shell. Examples:");
         w.WriteLine("        'tcp|127.0.0.1:9000/30'      TCP transport (quoted)");
-        w.WriteLine("        'direct|ep_name'             Direct transport, debug (quoted)");
         w.WriteLine();
         w.WriteLine("    --client-id <id>");
         w.WriteLine("        Required for client role. Unique identifier sent during");
@@ -196,6 +201,14 @@ internal static class CliParser
         w.WriteLine();
         w.WriteLine("    --debug-clients <N>");
         w.WriteLine("        Number of concurrent clients in debug mode. Default: 1.");
+        w.WriteLine();
+        w.WriteLine("    --debug-server-url <url>");
+        w.WriteLine("        Server transport URL for debug mode. Default:");
+        w.WriteLine("        'tcp|127.0.0.1:12345'");
+        w.WriteLine();
+        w.WriteLine("    --debug-client-url <url>");
+        w.WriteLine("        Client transport URL for debug mode. Defaults to the value of");
+        w.WriteLine("        --debug-server-url.");
         w.WriteLine();
         w.WriteLine("    -b, --buffer-size <bytes>");
         w.WriteLine("        Outgoing packet buffer size in bytes. Must be between 1500 and");
@@ -226,13 +239,19 @@ internal static class CliParser
         w.WriteLine("        PigeonPost --role client --client-id office-a \\");
         w.WriteLine("            --tun tun1 --url 'tcp|10.0.0.1:9000/30'");
         w.WriteLine();
-        w.WriteLine("    Debug mode with 3 clients:");
-        w.WriteLine("        PigeonPost --role debug --debug-clients 3 --url 'direct|ep_debug'");
+        w.WriteLine("    Debug mode with 3 clients on TCP:");
+        w.WriteLine("        PigeonPost --role debug --debug-clients 3 \\");
+        w.WriteLine("            --debug-server-url 'tcp|127.0.0.1:12345'");
+        w.WriteLine();
+        w.WriteLine("    Debug mode with Direct transport (single-process):");
+        w.WriteLine("        PigeonPost --role debug --debug-clients 3 \\");
+        w.WriteLine("            --debug-server-url 'direct|ep_debug'");
         w.WriteLine();
         w.WriteLine("PROJECT");
-        w.WriteLine("    PigeonPost.Tun      TUN device abstraction: open, close, read, write");
-        w.WriteLine("    PigeonPost.Bridge   Core bridging: packet buffering, transport handlers");
-        w.WriteLine("    PigeonPost          Entry point, CLI parsing, signal handling");
+        w.WriteLine("    PigeonPost.Tun          TUN device abstraction: open, close, read, write");
+        w.WriteLine("    PigeonPost.Tun.Virtual  Virtual TUN devices for testing");
+        w.WriteLine("    PigeonPost.Bridge       Core bridging: packet buffering, transport handlers");
+        w.WriteLine("    PigeonPost              Entry point, CLI parsing, signal handling");
         w.WriteLine();
         w.WriteLine("PigeonPost 1.0                        June 2026                     PIGEONPOST(1)");
     }
