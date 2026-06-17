@@ -52,7 +52,7 @@ internal static class CliParser
                 case "--debug-clients":
                     if (++i >= args.Length) { PrintError(errorWriter, "Missing value for --debug-clients."); return null; }
                     if (!int.TryParse(args[i], NumberStyles.None, CultureInfo.InvariantCulture, out debugClientCount))
-                        { PrintError(errorWriter, $"Invalid debug-clients: '{args[i]}'."); return null; }
+                    { PrintError(errorWriter, $"Invalid debug-clients: '{args[i]}'."); return null; }
                     break;
                 case "--debug-server-url":
                     if (++i >= args.Length) { PrintError(errorWriter, "Missing value for --debug-server-url."); return null; }
