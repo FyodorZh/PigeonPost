@@ -6,6 +6,7 @@ using Pontifex;
 using Pontifex.Abstractions;
 using Pontifex.Abstractions.Clients;
 using Pontifex.Abstractions.Servers;
+using Pontifex.Protocols.Monitoring.AckRaw;
 using Pontifex.Transports.Direct;
 using Pontifex.Transports.Tcp;
 using Scriba;
@@ -14,6 +15,9 @@ namespace PigeonPost;
 
 internal abstract class BaseApp
 {
+    protected readonly TransportFactory _serverTransportFactory = new();
+    protected readonly TransportFactory _clientTransportFactory = new();
+    
     protected readonly BridgeConfiguration _config;
     protected readonly ILogger _logger;
 
@@ -24,6 +28,14 @@ internal abstract class BaseApp
     {
         _config = config;
         _logger = logger;
+
+        _serverTransportFactory.Register(new AckRawDirectServerProducer());
+        _serverTransportFactory.Register(new AckRawLoggerServerProducer());
+        _serverTransportFactory.Register(new AckRawTcpServerProducer());
+        
+        _clientTransportFactory.Register(new AckRawDirectClientProducer());
+        _clientTransportFactory.Register(new AckRawLoggerClientProducer());
+        _clientTransportFactory.Register(new AckRawTcpClientProducer());
     }
 
     public abstract Task RunAsync();
@@ -36,26 +48,12 @@ internal abstract class BaseApp
 
     protected ITransport CreateTransport(string url, bool isServer)
     {
-        if (url.StartsWith("direct|"))
-        {
-            string name = url.Substring("direct|".Length);
-            if (isServer)
-                return new AckRawDirectServer(name, _logger, MemoryRental.Shared);
-            else
-                return new AckRawDirectClient(name, _logger, MemoryRental.Shared);
-        }
-
-        var factory = new TransportFactory();
-        var reg = new TransportFactoryRegistrator(factory);
-
-        if (isServer)
-            reg.Register<AckRawTcpServerProducer>();
-        else
-            reg.Register<AckRawTcpClientProducer>();
-
+        var factory = isServer ? _serverTransportFactory : _clientTransportFactory;
         var transport = factory.Construct(url, _logger, MemoryRental.Shared);
+        
         if (transport == null)
             throw new InvalidOperationException($"Failed to construct transport from URL: '{url}'");
+        
         return transport;
     }
 

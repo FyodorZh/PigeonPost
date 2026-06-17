@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Actuarius.Memory;
 using Pontifex;
 using Pontifex.Abstractions;
 using Pontifex.Abstractions.Clients;
@@ -20,9 +21,6 @@ internal sealed class DebugApp : BaseApp
     private static readonly IPv4 ServerIp = new(192, 168, 0, 1);
     private static readonly IPv4 ClientBaseIp = new(192, 168, 0, 2);
 
-    private Func<string, bool, ITransport> TransportFactory =>
-        (url, isServer) => CreateTransport(url, isServer);
-
     public DebugApp(BridgeConfiguration config, ILogger logger) : base(config, logger)
     {
         if (config.Role != Role.Debug)
@@ -38,7 +36,7 @@ internal sealed class DebugApp : BaseApp
         using var harness = new VirtualTrafficHarness();
 
         var serverSide = new ServerSideLogic(
-            harness.ServerDevice, serverUrl, _logger, TransportFactory,
+            harness.ServerDevice, serverUrl, _logger, _serverTransportFactory,
             _config.BufferSizeBytes, _config.Verbose);
 
         var clientSides = new List<ClientSideLogic>();
@@ -71,7 +69,7 @@ internal sealed class DebugApp : BaseApp
 
             var clientSide = new ClientSideLogic(
                 clientTun, clientId, clientIp, ServerIp,
-                clientUrl, _logger, _cts.Token, TransportFactory,
+                clientUrl, _logger, _cts.Token, _clientTransportFactory,
                 serverSide.RemoveClient, pending,
                 _config.BufferSizeBytes, _config.Verbose,
                 harness.Network);
@@ -133,7 +131,7 @@ internal sealed class DebugApp : BaseApp
         private readonly ITunDevice _tun;
         private readonly string _serverUrl;
         private readonly ILogger _logger;
-        private readonly Func<string, bool, ITransport> _transportFactory;
+        private readonly Pontifex.ITransportFactory _transportFactory;
         private readonly int _bufferSizeBytes;
         private readonly bool _verbose;
 
@@ -149,7 +147,7 @@ internal sealed class DebugApp : BaseApp
             ITunDevice tun,
             string serverUrl,
             ILogger logger,
-            Func<string, bool, ITransport> transportFactory,
+            Pontifex.ITransportFactory transportFactory,
             int bufferSizeBytes,
             bool verbose)
         {
@@ -182,7 +180,7 @@ internal sealed class DebugApp : BaseApp
             _bridge = new BridgeImpl(_tun, buffer, _logger, _verbose);
             _bridge.SetPacketHandler(_hub.OnPacketFromTun);
 
-            var transport = _transportFactory(_serverUrl, true);
+            var transport = _transportFactory.Construct(_serverUrl, _logger, MemoryRental.Shared);
             if (transport is not IAckRawServer ackServer)
                 throw new InvalidOperationException("Server transport is not an IAckRawServer.");
 
@@ -211,7 +209,7 @@ internal sealed class DebugApp : BaseApp
         private readonly string _clientUrl;
         private readonly ILogger _logger;
         private readonly CancellationToken _externalCt;
-        private readonly Func<string, bool, ITransport> _transportFactory;
+        private readonly Pontifex.ITransportFactory _transportFactory;
         private readonly Action<string> _removeClient;
         private readonly Queue<byte[]> _pending;
         private readonly int _bufferSizeBytes;
@@ -230,7 +228,7 @@ internal sealed class DebugApp : BaseApp
             string clientUrl,
             ILogger logger,
             CancellationToken externalCt,
-            Func<string, bool, ITransport> transportFactory,
+            Pontifex.ITransportFactory transportFactory,
             Action<string> removeClient,
             Queue<byte[]> pending,
             int bufferSizeBytes,
@@ -260,7 +258,7 @@ internal sealed class DebugApp : BaseApp
             var handshake = new ClientHandshake(new ClientId(_clientId), _clientIp.Value);
             var handler = new BridgeClientHandler(_bridge, handshake);
 
-            var transport = _transportFactory(_clientUrl, false);
+            var transport = _transportFactory.Construct(_clientUrl, _logger, MemoryRental.Shared);
             if (transport is not IAckRawClient ackClient)
                 throw new InvalidOperationException("Client transport is not an IAckRawClient.");
 
