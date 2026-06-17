@@ -25,9 +25,10 @@ public class ClientSideLogic
     private readonly int _bufferSizeBytes;
     private readonly bool _verbose;
 
-    private BridgeImpl? _bridge;
+    private readonly ClientHandshake _handshake;
+    private readonly BridgeImpl _bridge;
+
     private ITransport? _transport;
-    private ClientHandshake? _handshake;
     private TaskCompletionSource? _transportStoppedTcs;
     private volatile bool _stopped;
 
@@ -51,6 +52,12 @@ public class ClientSideLogic
         _transportFactory = transportFactory;
         _bufferSizeBytes = bufferSizeBytes;
         _verbose = verbose;
+        
+        _handshake = new ClientHandshake(_clientId, _clientIp.Value);
+        
+        var buffer = new PacketBuffer(_bufferSizeBytes);
+        _bridge = new BridgeImpl(_tun, buffer, _logger, _verbose);
+        _bridge.OnStopped += OnBridgeStopped;
     }
 
     public virtual void RequestShutdown()
@@ -60,15 +67,8 @@ public class ClientSideLogic
 
     public virtual Task Start()
     {
-        var buffer = new PacketBuffer(_bufferSizeBytes);
-        _bridge = new BridgeImpl(_tun, buffer, _logger, _verbose);
-        _bridge.OnStopped += OnBridgeStopped;
         _bridge.Start();
-
-        _handshake = new ClientHandshake(_clientId, _clientIp.Value);
-
         _ = ReconnectLoopAsync();
-
         return Task.CompletedTask;
     }
 
