@@ -11,12 +11,4 @@ internal static class PontifexPacketConverter
         list.PutFirst(new UnionData(new StaticReadOnlyByteArray(packet)));
         return list;
     }
-
-    public static byte[] ExtractPacket(IMultiRefReadOnlyByteArray data)
-    {
-        int count = data.Count;
-        byte[] copy = new byte[count];
-        data.CopyTo(copy, 0, 0, count);
-        return copy;
-    }
 }

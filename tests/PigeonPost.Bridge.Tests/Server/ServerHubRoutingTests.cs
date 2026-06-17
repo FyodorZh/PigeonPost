@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using PigeonPost.Bridge;
+using PigeonPost.Tun;
 
 namespace PigeonPost.Bridge.Tests.Server;
 
@@ -18,9 +19,9 @@ public class ServerHubRoutingTests
     public void Packet_DestinedToClientA_SentOnlyToClientA()
     {
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), 0xC0A80101), out _);
+            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-b"), 0xC0A80102), out _);
+            new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102), out _);
 
         byte[] packet = BuildIpv4Packet(dest: 0xC0A80101, source: 0x0A000001);
 
@@ -35,7 +36,7 @@ public class ServerHubRoutingTests
     public void Packet_NoMatchingHostRoute_Dropped()
     {
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), 0xC0A80101), out _);
+            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
 
         byte[] packet = BuildIpv4Packet(dest: 0xC0A801FF, source: 0x0A000001);
 
@@ -49,9 +50,9 @@ public class ServerHubRoutingTests
     public void Packet_NoBroadcastBehavior()
     {
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), 0xC0A80101), out _);
+            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-b"), 0xC0A80102), out _);
+            new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102), out _);
 
         byte[] packet = BuildIpv4Packet(dest: 0xC0A80101, source: 0x0A000001);
 
@@ -65,7 +66,7 @@ public class ServerHubRoutingTests
     public void DisconnectedClient_RouteDropped()
     {
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), 0xC0A80101), out _);
+            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
         _hub.RemoveSession(new ClientId("client-a"));
 
         byte[] packet = BuildIpv4Packet(dest: 0xC0A80101, source: 0x0A000001);

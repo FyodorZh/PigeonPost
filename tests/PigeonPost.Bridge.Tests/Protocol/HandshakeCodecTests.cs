@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using NUnit.Framework;
 using PigeonPost.Bridge;
+using PigeonPost.Tun;
 
 namespace PigeonPost.Bridge.Tests.Protocol;
 
@@ -12,12 +13,12 @@ public class HandshakeCodecTests
     public void EncodeRequest_DecodeRequest_RoundTrips()
     {
         var clientId = new ClientId("test-client-1");
-        var handshake = new ClientHandshake(clientId, 0xC0A80101);
+        var handshake = new ClientHandshake(clientId, (IPv4)0xC0A80101);
         byte[] encoded = HandshakeCodec.EncodeRequest(handshake);
         var decoded = HandshakeCodec.DecodeRequest(encoded);
         Assert.That(decoded, Is.Not.Null);
         Assert.That(decoded!.ClientId, Is.EqualTo(clientId));
-        Assert.That(decoded.AdvertisedHostIpv4, Is.EqualTo(0xC0A80101u));
+        Assert.That(decoded.AdvertisedHostIpv4, Is.EqualTo(new IPv4(0xC0A80101)));
     }
 
     [Test]
@@ -86,7 +87,7 @@ public class HandshakeCodecTests
     public void DecodeRequest_ClientIdTooLong_ForDeclaredLength_ReturnsNull()
     {
         var clientId = new ClientId("ab");
-        var hs = new ClientHandshake(clientId, 0xC0A80101);
+        var hs = new ClientHandshake(clientId, (IPv4)0xC0A80101);
         byte[] encoded = HandshakeCodec.EncodeRequest(hs);
 
         byte[] truncated = new byte[encoded.Length - 5];
@@ -99,7 +100,7 @@ public class HandshakeCodecTests
     {
         string id = new string('x', 255);
         var clientId = new ClientId(id);
-        var handshake = new ClientHandshake(clientId, 0x0A000001);
+        var handshake = new ClientHandshake(clientId, (IPv4)0x0A000001);
         byte[] encoded = HandshakeCodec.EncodeRequest(handshake);
         var decoded = HandshakeCodec.DecodeRequest(encoded);
         Assert.That(decoded, Is.Not.Null);
@@ -111,7 +112,7 @@ public class HandshakeCodecTests
     {
         string id = new string('x', 256);
         var clientId = new ClientId(id);
-        var handshake = new ClientHandshake(clientId, 0);
+        var handshake = new ClientHandshake(clientId, (IPv4)0);
 
         Assert.That(
             () => HandshakeCodec.EncodeRequest(handshake),

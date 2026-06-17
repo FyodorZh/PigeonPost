@@ -33,13 +33,14 @@ internal sealed class BridgeServerHandler : IAckRawServerHandler
 
     public void OnReceived(UnionDataList receivedBuffer)
     {
-        using var guard = IReleasableResource_Ext.AsDisposable(receivedBuffer);
+        using var guard = receivedBuffer.AsDisposable();
 
-        if (receivedBuffer.TryPopFirst(out IMultiRefReadOnlyByteArray? data) && data != null)
+        if (receivedBuffer.TryPopFirst(out IMultiRefReadOnlyByteArray? data))
         {
-            byte[] packet = PontifexPacketConverter.ExtractPacket(data);
+            using var dataGuard = data.AsDisposable();
+            byte[]? packet = data.ToArray();
 
-            if (_handshake != null)
+            if (_handshake != null && packet != null)
             {
                 _hub.OnPacketFromClient(_handshake.ClientId, packet);
             }

@@ -53,7 +53,7 @@ public class ClientSideLogic
         _bufferSizeBytes = bufferSizeBytes;
         _verbose = verbose;
         
-        _handshake = new ClientHandshake(_clientId, _clientIp.Value);
+        _handshake = new ClientHandshake(_clientId, _clientIp);
         
         var buffer = new PacketBuffer(_bufferSizeBytes);
         _bridge = new BridgeImpl(_tun, buffer, _logger, _verbose);

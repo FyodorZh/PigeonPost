@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Pontifex;
 using Pontifex.Abstractions.Endpoints;
 using PigeonPost.Bridge;
+using PigeonPost.Tun;
 
 namespace PigeonPost.Bridge.Tests.Server;
 
@@ -9,7 +10,7 @@ internal sealed class FakeServerHub : IServerHub
 {
     private readonly object _lock = new();
     private readonly Dictionary<ClientId, ClientSession> _sessionsByClientId = new();
-    private readonly Dictionary<uint, ClientId> _clientIdByHostIp = new();
+    private readonly Dictionary<IPv4, ClientId> _clientIdByHostIp = new();
 
     public int ActiveSessionCount
     {
@@ -76,7 +77,7 @@ internal sealed class FakeServerHub : IServerHub
 
         lock (_lock)
         {
-            if (_clientIdByHostIp.TryGetValue(dest, out var clientId))
+            if (_clientIdByHostIp.TryGetValue((IPv4)dest, out var clientId))
             {
                 if (_sessionsByClientId.TryGetValue(clientId, out _))
                 {

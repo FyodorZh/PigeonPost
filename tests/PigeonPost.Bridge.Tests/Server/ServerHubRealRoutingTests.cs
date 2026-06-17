@@ -7,6 +7,7 @@ using Pontifex.Abstractions;
 using Pontifex.Abstractions.Endpoints;
 using Pontifex.Utils;
 using PigeonPost.Bridge;
+using PigeonPost.Tun;
 using Scriba;
 using Scriba.Consumers;
 
@@ -108,7 +109,7 @@ public class ServerHubRealRoutingTests
 
     private void RegisterAndActivate(string clientId, uint hostIp, TrackingEndpoint endpoint)
     {
-        var handshake = new ClientHandshake(new ClientId(clientId), hostIp);
+        var handshake = new ClientHandshake(new ClientId(clientId), (IPv4)hostIp);
         var result = _hub.TryRegisterSession(handshake, out _);
         Assert.That(result, Is.EqualTo(SessionRegistrationResult.Accepted));
         _hub.ActivateSessionEndpoint(new ClientId(clientId), endpoint);
@@ -140,10 +141,15 @@ public class ServerHubRealRoutingTests
 
         public SendResult Send(UnionDataList bufferToSend)
         {
-            if (bufferToSend.TryPopFirst(out IMultiRefReadOnlyByteArray? data) && data != null)
+            using var disposer = bufferToSend.AsDisposable();
+            if (bufferToSend.TryPopFirst(out IMultiRefReadOnlyByteArray? data))
             {
-                byte[] copy = PontifexPacketConverter.ExtractPacket(data);
-                SentPackets.Add(copy);
+                byte[]? copy = data.ToArray();
+                data.Release();
+                if (copy != null)
+                {
+                    SentPackets.Add(copy);
+                }
             }
             return SendResult.Ok;
         }

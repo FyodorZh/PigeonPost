@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using PigeonPost.Bridge;
+using PigeonPost.Tun;
 
 namespace PigeonPost.Bridge.Tests.Server;
 
@@ -18,7 +19,7 @@ public class InboundSourceValidationTests
     public void ClientPacket_SourceEqualsAdvertisedIp_Accepted()
     {
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), 0xC0A80101), out _);
+            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
 
         byte[] packet = BuildIpv4Packet(source: 0xC0A80101, dest: 0x0A000001);
 
@@ -32,7 +33,7 @@ public class InboundSourceValidationTests
     public void ClientPacket_SourceDiffersFromAdvertisedIp_Dropped()
     {
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), 0xC0A80101), out _);
+            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
 
         byte[] packet = BuildIpv4Packet(source: 0xC0A80199, dest: 0x0A000001);
 
@@ -46,7 +47,7 @@ public class InboundSourceValidationTests
     public void ClientPacket_MalformedIpv4_Dropped()
     {
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), 0xC0A80101), out _);
+            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
 
         byte[] packet = new byte[] { 0x45, 0x00 };
 
@@ -60,9 +61,9 @@ public class InboundSourceValidationTests
     public void MultipleClients_EachValidatedSeparately()
     {
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), 0xC0A80101), out _);
+            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-b"), 0xC0A80102), out _);
+            new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102), out _);
 
         byte[] validA = BuildIpv4Packet(source: 0xC0A80101, dest: 0x0A000001);
         byte[] spoofedB = BuildIpv4Packet(source: 0xC0A80199, dest: 0x0A000002);
