@@ -4,11 +4,10 @@ using Actuarius.Memory;
 using Pontifex;
 using Pontifex.Abstractions;
 using Pontifex.Abstractions.Clients;
-using PigeonPost.Bridge;
 using PigeonPost.Tun;
 using Scriba;
 
-namespace PigeonPost;
+namespace PigeonPost.Bridge;
 
 public class ClientSideLogic
 {
