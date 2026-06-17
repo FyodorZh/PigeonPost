@@ -4,8 +4,6 @@ using System.Threading.Tasks;
 using Actuarius.Memory;
 using Pontifex;
 using Pontifex.Abstractions;
-using Pontifex.Abstractions.Clients;
-using Pontifex.Abstractions.Servers;
 using Pontifex.Protocols.Monitoring.AckRaw;
 using Pontifex.Transports.Direct;
 using Pontifex.Transports.Tcp;
