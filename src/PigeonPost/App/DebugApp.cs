@@ -17,6 +17,7 @@ internal sealed class DebugApp : BaseApp
     private readonly VirtualTrafficHarness _harness;
     private readonly ServerSideLogic _serverLogic;
     private readonly List<ClientSideLogic> _clientLogics;
+    private readonly HashSet<string> _activeClients;
 
     public DebugApp(BridgeConfiguration config, ILogger logger) : base(config, logger)
     {
@@ -28,6 +29,7 @@ internal sealed class DebugApp : BaseApp
         string clientUrl = _config.DebugClientUrl;
 
         _harness = new VirtualTrafficHarness();
+        _activeClients = new HashSet<string>();
 
         _serverLogic = new ServerSideLogic(
             _harness.ServerDevice, serverUrl, _logger, _serverTransportFactory,
@@ -66,12 +68,26 @@ internal sealed class DebugApp : BaseApp
                 _config.BufferSizeBytes, _config.Verbose,
                 pending, _harness.Network);
 
-            client.Stopped += id => _serverLogic.RemoveClient(id.Value);
+            client.Stopped += id => RemoveClient(id.Value);
             _clientLogics.Add(client);
-            _serverLogic.AddClient(clientId.Value);
+            AddClient(clientId.Value);
         }
         
         _logger.i($"Debug mode starting: {clientCount} virtual client(s), server={serverUrl}");
+    }
+
+    private void AddClient(string clientId)
+    {
+        if (!_activeClients.Add(clientId))
+            _logger.w($"Duplicate client ID '{clientId}' in debug mode.");
+
+        _logger.i($"Debug client '{clientId}' active ({_activeClients.Count} total).");
+    }
+
+    private void RemoveClient(string clientId)
+    {
+        if (_activeClients.Remove(clientId) && _activeClients.Count == 0)
+            _serverLogic.Stop();
     }
 
     public override void RequestShutdown()

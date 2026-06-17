@@ -1,5 +1,5 @@
 using System;
-using System.Threading;
+using Actuarius.Collections;
 using Actuarius.Memory;
 using Pontifex;
 using Pontifex.Abstractions;
@@ -15,14 +15,13 @@ public sealed class ServerSideLogic
     private readonly ITunDevice _tun;
     private readonly string _serverUrl;
     private readonly ILogger _logger;
-    private readonly Pontifex.ITransportFactory _transportFactory;
+    private readonly ITransportFactory _transportFactory;
     private readonly int _bufferSizeBytes;
     private readonly bool _verbose;
 
     private ServerHub? _hub;
     private BridgeImpl? _bridge;
     private ITransport? _transport;
-    private int _activeClients;
     private volatile bool _stopped;
 
     public event Action? Stopped;
@@ -31,7 +30,7 @@ public sealed class ServerSideLogic
         ITunDevice tun,
         string serverUrl,
         ILogger logger,
-        Pontifex.ITransportFactory transportFactory,
+        ITransportFactory transportFactory,
         int bufferSizeBytes,
         bool verbose)
     {
@@ -41,19 +40,6 @@ public sealed class ServerSideLogic
         _transportFactory = transportFactory;
         _bufferSizeBytes = bufferSizeBytes;
         _verbose = verbose;
-    }
-
-    public void AddClient(string clientId)
-    {
-        Interlocked.Increment(ref _activeClients);
-    }
-
-    public void RemoveClient(string clientId)
-    {
-        if (Interlocked.Decrement(ref _activeClients) == 0)
-        {
-            Stop();
-        }
     }
 
     public void Start()
