@@ -1,4 +1,4 @@
-namespace PigeonPost.Bridge;
+namespace PigeonPost.Tun;
 
 public sealed class Ipv4PacketInfo
 {

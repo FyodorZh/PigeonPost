@@ -12,4 +12,6 @@ public sealed class BridgeConfiguration
     public bool Verbose { get; init; }
     public string? ClientId { get; init; }
     public int DebugClientCount { get; init; } = 1;
+    public string DebugServerUrl { get; init; } = "tcp|127.0.0.1:12345";
+    public string DebugClientUrl { get; init; } = "tcp|127.0.0.1:12345";
 }

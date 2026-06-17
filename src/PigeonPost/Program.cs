@@ -1,15 +1,15 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Scriba;
-using Scriba.Consumers;
 
 namespace PigeonPost;
 
 internal static class Program
 {
-    private static App? _app;
-    
+    private static BaseApp? _app;
+
     public class ConsoleConsumer2 : MultiRefLogConsumer
     {
         public ILogFormatter Formatter { get; set; } = new SynchronizedLogFormatter(DefaultFormatter);
@@ -33,7 +33,7 @@ internal static class Program
         }
     }
 
-    static int Main(string[] args)
+    static async Task<int> Main(string[] args)
     {
         var config = CliParser.Parse(args, Console.Error);
         if (config == null)
@@ -43,7 +43,13 @@ internal static class Program
         StaticLogger.Instance.LogTime = true;
         var logger = StaticLogger.Instance;
 
-        _app = new App(config, logger);
+        _app = config.Role switch
+        {
+            Role.Server => new ServerApp(config, logger),
+            Role.Client => new ClientApp(config, logger),
+            Role.Debug => new DebugApp(config, logger),
+            _ => throw new InvalidOperationException($"Unknown role: {config.Role}")
+        };
 
         if (OperatingSystem.IsLinux())
         {
@@ -64,7 +70,7 @@ internal static class Program
 
         try
         {
-            _app.RunAsync().GetAwaiter().GetResult();
+            await _app.RunAsync();
             return 0;
         }
         catch (Exception ex)

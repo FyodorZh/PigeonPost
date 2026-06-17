@@ -37,12 +37,14 @@ public class CliParserTests
     }
 
     [Test]
-    public void Debug_Role_WithOneTun_DefaultsSecond()
+    public void Debug_Role_DefaultsServerAndClientUrl()
     {
-        var cfg = CliParser.Parse(new[] { "-r", "debug", "-t", "tunA", "-u", "direct|ep" }, TextWriter.Null);
+        var cfg = CliParser.Parse(new[] { "-r", "debug", "--debug-server-url", "tcp|127.0.0.1:12345" }, TextWriter.Null);
         Assert.That(cfg, Is.Not.Null);
         Assert.That(cfg!.Role, Is.EqualTo(Role.Debug));
-        Assert.That(cfg!.TunNames, Is.EquivalentTo(new[] { "tunA", "tunB" }));
+        Assert.That(cfg.DebugServerUrl, Is.EqualTo("tcp|127.0.0.1:12345"));
+        Assert.That(cfg.DebugClientUrl, Is.EqualTo(cfg.DebugServerUrl));
+        Assert.That(cfg.DebugClientCount, Is.EqualTo(1));
     }
 
     [Test]
