@@ -8,8 +8,8 @@ namespace PigeonPost;
 
 internal static class Program
 {
-    private static App? _app;
-    
+    private static BaseApp? _app;
+
     public class ConsoleConsumer2 : MultiRefLogConsumer
     {
         public ILogFormatter Formatter { get; set; } = new SynchronizedLogFormatter(DefaultFormatter);
@@ -43,7 +43,13 @@ internal static class Program
         StaticLogger.Instance.LogTime = true;
         var logger = StaticLogger.Instance;
 
-        _app = new App(config, logger);
+        _app = config.Role switch
+        {
+            Role.Server => new ServerApp(config, logger),
+            Role.Client => new ClientApp(config, logger),
+            Role.Debug => new DebugApp(config, logger),
+            _ => throw new InvalidOperationException($"Unknown role: {config.Role}")
+        };
 
         if (OperatingSystem.IsLinux())
         {
