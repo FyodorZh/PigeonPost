@@ -10,14 +10,13 @@ internal sealed class ClientApp : BaseApp
 {
     private readonly TunDevice _tun;
     private readonly ClientSideLogic _logic;
-    
+
     public ClientApp(BridgeConfiguration config, ILogger logger) : base(config, logger)
     {
         if (config.Role != Role.Client)
             throw new ArgumentException("Role must be Client.", nameof(config));
-        
+
         var tunName = _config.TunNames[0];
-        var clientId = _config.ClientId!;
 
         uint hostIpv4;
         try
@@ -30,7 +29,7 @@ internal sealed class ClientApp : BaseApp
             throw;
         }
 
-        _logger.i($"Client ID: {clientId}, host IPv4: {FormatIp(hostIpv4)}");
+        _logger.i($"Host IPv4: {FormatIp(hostIpv4)}");
 
         _tun = new TunDevice(tunName);
         _tun.SetSendBufferSize(1048576);
@@ -38,7 +37,6 @@ internal sealed class ClientApp : BaseApp
 
         _logic = new ClientSideLogic(
             _tun,
-            new ClientId(clientId),
             new IPv4(hostIpv4),
             new IPv4(0),
             _config.PontifexUrl,
@@ -51,7 +49,7 @@ internal sealed class ClientApp : BaseApp
     public override async Task RunAsync()
     {
         var stoppedTcs = new TaskCompletionSource();
-        _logic.Stopped += _ => stoppedTcs.TrySetResult();
+        _logic.Stopped += () => stoppedTcs.TrySetResult();
 
         _ = _logic.Start();
 

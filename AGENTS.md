@@ -8,8 +8,9 @@ In the current V1 implementation, one server can bridge multiple concurrent clie
 It runs on .NET 10 (`net10.0`), Linux only (Debian/Ubuntu), with no implicit usings
 and nullable enabled project-wide.
 
-PigeonPost now implements the V1 `1-to-many` server model with explicit client
-identity, exact-host IPv4 routing, and separate client/server runtime responsibilities.
+PigeonPost now implements the V1 `1-to-many` server model where each client is
+identified by its advertised IPv4 host address, with exact-host IPv4 routing, and
+separate client/server runtime responsibilities.
 
 ```
 (server WAN) ←routing→ (server TUN) ←→ (PigeonPost server)
@@ -28,6 +29,7 @@ PigeonPost.sln
 ├── src/
 │   ├── PigeonPost/             Console app — entry point, CLI parsing, orchestration
 │   ├── PigeonPost.Tun/         Class library — Linux TUN device I/O via P/Invoke
+│   ├── PigeonPost.Tun.Virtual/ Class library — virtual TUN devices for testing
 │   └── PigeonPost.Bridge/      Class library — client bridge, protocol, server hub, Pontifex handlers
 │       ├── Protocol/           Handshake codec, client identity, IPv4 packet parsing
 │       ├── Server/             Session registry and exact-host routing hub
@@ -56,15 +58,14 @@ PigeonPost.sln
 
 ### Current V1 implementation
 - Server runtime owns one TUN device and supports multiple concurrent client sessions.
-- Each client session is keyed by `clientId` and one advertised IPv4 host address.
+- Each client session is keyed by its advertised IPv4 host address.
 - Client runtime reconnects forever and uses one TUN device.
 - Debug mode simulates one server and `N` concurrent clients using Direct transport.
 
 ### Architecture rules
 Important V1 rules:
 - one client == one advertised IPv4 host route
-- explicit `clientId` in handshake
-- duplicate `clientId` and duplicate host-IP claims are rejected
+- duplicate host-IP claims are rejected
 - IPv4-only server-side routing in V1
 - no fallback route and no server-side buffering for missing routes
 - client and server runtime responsibilities are split into separate abstractions
@@ -77,7 +78,7 @@ These rules are design constraints, not optional implementation details.
 
 | Role   | Behavior |
 |--------|----------|
-| **Server** | Listens via Pontifex for multiple simultaneous clients, bridges them to one TUN device, and routes packets by exact IPv4 host match. Rejects duplicate `clientId` and duplicate host-IP claims during handshake. |
+| **Server** | Listens via Pontifex for multiple simultaneous clients, bridges them to one TUN device, and routes packets by exact IPv4 host match. Rejects duplicate host-IP claims during handshake. |
 | **Client** | Connects to a server via Pontifex, bridges to one TUN. Loops forever, reconnecting after every disconnect with a 1-second delay. |
 | **Debug**  | Single-process mode that runs one server plus `N` concurrent clients using Direct transport. Uses one server TUN and one client TUN per simulated client. |
 
@@ -177,7 +178,8 @@ Some integration tests require pre-created TUN devices (`tunA`, `tunB`). Run the
 
 ```
 PigeonPost --role <server|client|debug> --tun <name> [--tun <name2> ...] --url <url>
-           [--client-id <id>] [--debug-clients <N>] [options]
+           [--debug-clients <N>] [--debug-server-url <url>]
+           [--debug-client-url <url>] [options]
 ```
 
 | Argument | Required | Default | Description |
@@ -185,8 +187,9 @@ PigeonPost --role <server|client|debug> --tun <name> [--tun <name2> ...] --url <
 | `-r, --role` | Yes | — | `server`, `client`, or `debug` |
 | `-t, --tun` | Server/Client: once. Debug: optional/repeatable | Debug: auto-generated if omitted | TUN device name(s) |
 | `-u, --url` | Yes | — | Pontifex transport URL (e.g. `tcp\|10.0.0.1:9000/30`) |
-| `--client-id` | Client only | — | Required client identity sent during handshake |
 | `--debug-clients` | Debug only | `1` | Number of concurrent debug clients |
+| `--debug-server-url` | Debug only | `tcp\|127.0.0.1:12345` | Server transport URL for debug mode |
+| `--debug-client-url` | Debug only | Same as `--debug-server-url` | Client transport URL for debug mode |
 | `-b, --buffer-size` | No | `10485760` (10 MB) | Outgoing packet buffer in bytes (1500–1,073,741,824) |
 | `-v, --verbose` | No | `false` | Log every packet size |
 | `-h, --help` | No | — | Show man-page help |
@@ -201,7 +204,7 @@ PigeonPost --role <server|client|debug> --tun <name> [--tun <name2> ...] --url <
 PigeonPost --role server --tun tun0 --url 'tcp|0.0.0.0:9000/30'
 
 # Client connecting to the server, bridging tun1
-PigeonPost --role client --client-id office-a --tun tun1 --url 'tcp|10.0.0.1:9000/30'
+PigeonPost --role client --tun tun1 --url 'tcp|10.0.0.1:9000/30'
 
 # Debug mode with three clients
 PigeonPost --role debug --debug-clients 3 --url 'direct|ep_debug'
@@ -289,8 +292,8 @@ to one must be mirrored in the other:
 | `deploy/client/deploy-docker.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 | `deploy/client/deploy-plain.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 
-Client deployment artifacts accept `CLIENT_ID` and pass it to `--client-id`. Current
-client helper scripts default `CLIENT_ID` to `pp-client-1` if it is not set explicitly.
+Client deployment artifacts link to the pre-configured `CLIENT_ID` variable.
+Current client helper scripts default `CLIENT_ID` to `pp-client-1` if not set.
 
 ### Idempotency Requirements
 
@@ -343,6 +346,9 @@ call `Send(UnionDataList)`.
 - `AckRawTcpServer` / `AckRawTcpClient` — TCP network transport with configurable
   timeouts and keep-alive. Constructed via `TransportFactory` from URL strings.
   Types are `internal`, accessed via producer pattern.
+- `AckRawLoggerServerProducer` / `AckRawLoggerClientProducer` — logging wrappers
+  registered in both server and client transport factories. From
+  `Pontifex.Protocols.Monitoring.AckRaw`.
 
 **Message format**: `UnionDataList` is the message container. PigeonPost wraps each
 raw IP packet as a single `UnionData(new StaticReadOnlyByteArray(packet))` in a
@@ -350,9 +356,9 @@ one-element list.
 
 **Handshake**: Acknowledging (`IAck` prefix) transports perform a 3-way handshake:
 client sends `WriteAckData`, server calls `TryAck` (accept/reject), then handlers
-receive `OnConnected`. PigeonPost uses a compact binary handshake carrying
-`clientId` and one advertised IPv4 host route. The server acknowledger rejects
-duplicate identities, duplicate host-IP claims, malformed handshakes, and shutdown-time
+receive `OnConnected`. PigeonPost uses a compact 4-byte binary handshake carrying
+the client's advertised IPv4 host address. The server acknowledger rejects
+duplicate host-IP claims, malformed handshakes, and shutdown-time
 connections, and reports rejection reasons to the client via a compact ack payload.
 
 **Stop reasons**: Typed disconnect reasons (`StopReason.UserIntention`, `TimeOut`,
@@ -402,7 +408,7 @@ Current V1 packet rules:
 ## Operational Guidance
 
 When extending the current V1 architecture, preserve these invariants:
-- keep `clientId` ownership and advertised host-IP ownership explicit
+- keep advertised host-IP ownership explicit
 - keep routing exact-host and IPv4-only unless the protocol is intentionally expanded
 - keep duplicate identity and duplicate host-IP rejection deterministic
 - keep missing-route and invalid-source behavior as drop-and-log unless a new design explicitly replaces it

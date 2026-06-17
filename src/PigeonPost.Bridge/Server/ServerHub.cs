@@ -12,8 +12,7 @@ namespace PigeonPost.Bridge;
 public class ServerHub : IServerHub, IDisposable
 {
     private readonly object _lock = new();
-    private readonly Dictionary<ClientId, ClientSession> _sessionsByClientId = new();
-    private readonly Dictionary<IPv4, ClientId> _clientIdByHostIp = new();
+    private readonly Dictionary<IPv4, ClientSession> _sessions = new();
     private readonly ILogger _logger;
     private readonly ITunDevice? _tun;
 
@@ -21,7 +20,7 @@ public class ServerHub : IServerHub, IDisposable
 
     public int ActiveSessionCount
     {
-        get { lock (_lock) return _sessionsByClientId.Count; }
+        get { lock (_lock) return _sessions.Count; }
     }
 
     public long DroppedNoRoute { get; private set; }
@@ -49,29 +48,25 @@ public class ServerHub : IServerHub, IDisposable
 
         lock (_lock)
         {
-            if (_sessionsByClientId.ContainsKey(handshake.ClientId))
-                return SessionRegistrationResult.RejectedDuplicateId;
-
-            if (_clientIdByHostIp.ContainsKey(handshake.AdvertisedHostIpv4))
+            if (_sessions.ContainsKey(handshake.AdvertisedHostIpv4))
                 return SessionRegistrationResult.RejectedDuplicateHostIp;
 
             var endpoint = new PendingEndpoint();
-            session = new ClientSession(handshake.ClientId, handshake.AdvertisedHostIpv4, endpoint);
+            session = new ClientSession(handshake.AdvertisedHostIpv4, endpoint);
 
-            _sessionsByClientId[handshake.ClientId] = session;
-            _clientIdByHostIp[handshake.AdvertisedHostIpv4] = handshake.ClientId;
+            _sessions[handshake.AdvertisedHostIpv4] = session;
 
-            _logger.i($"Session registered: clientId={handshake.ClientId.Value}, host={FormatIp(handshake.AdvertisedHostIpv4)}");
+            _logger.i($"Session registered: host={handshake.AdvertisedHostIpv4}");
 
             return SessionRegistrationResult.Accepted;
         }
     }
 
-    public virtual void ActivateSessionEndpoint(ClientId clientId, IAckRawBaseEndpoint endpoint)
+    public virtual void ActivateSessionEndpoint(IPv4 hostIp, IAckRawBaseEndpoint endpoint)
     {
         lock (_lock)
         {
-            if (_sessionsByClientId.TryGetValue(clientId, out var session)
+            if (_sessions.TryGetValue(hostIp, out var session)
                 && session.Endpoint is PendingEndpoint pending)
             {
                 pending.RealEndpoint = endpoint;
@@ -79,18 +74,15 @@ public class ServerHub : IServerHub, IDisposable
         }
     }
 
-    public void RemoveSession(ClientId clientId)
+    public void RemoveSession(IPv4 hostIp)
     {
-        ClientSession? session;
         lock (_lock)
         {
-            if (!_sessionsByClientId.Remove(clientId, out session))
+            if (!_sessions.Remove(hostIp, out var session))
                 return;
-
-            _clientIdByHostIp.Remove(session.AdvertisedHostIpv4);
         }
 
-        _logger.i($"Session removed: clientId={session.ClientId.Value}, host={FormatIp(session.AdvertisedHostIpv4)}");
+        _logger.i($"Session removed: host={hostIp}");
     }
 
     public void OnPacketFromTun(byte[] packet)
@@ -103,18 +95,14 @@ public class ServerHub : IServerHub, IDisposable
         }
 
         IAckRawBaseEndpoint? targetEndpoint;
-        string? targetClientId;
         lock (_lock)
         {
-            if (!_clientIdByHostIp.TryGetValue((IPv4)info.DestinationAddress, out var clientId)
-                || !_sessionsByClientId.TryGetValue(clientId, out var clientSession))
+            if (!_sessions.TryGetValue((IPv4)info.DestinationAddress, out var clientSession))
             {
-                targetClientId = null;
                 targetEndpoint = null;
             }
             else
             {
-                targetClientId = clientId.Value;
                 targetEndpoint = clientSession.Endpoint;
             }
         }
@@ -131,11 +119,11 @@ public class ServerHub : IServerHub, IDisposable
         if (result != SendResult.Ok)
         {
             DroppedNoRoute++;
-            _logger.w($"Send failed for clientId={targetClientId}: {result}");
+            _logger.w($"Send failed for host={(IPv4)info.DestinationAddress}: {result}");
         }
     }
 
-    public virtual void OnPacketFromClient(ClientId clientId, byte[] packet)
+    public virtual void OnPacketFromClient(IPv4 hostIp, byte[] packet)
     {
         var info = Ipv4PacketParser.TryParse(packet);
         if (info == null)
@@ -146,13 +134,13 @@ public class ServerHub : IServerHub, IDisposable
 
         lock (_lock)
         {
-            if (!_sessionsByClientId.TryGetValue(clientId, out var session))
+            if (!_sessions.TryGetValue(hostIp, out var session))
                 return;
 
-            if (info.SourceAddress != session.AdvertisedHostIpv4)
+            if (info.SourceAddress != session.AdvertisedHostIpv4.Value)
             {
                 DroppedInvalidSource++;
-                _logger.w($"Invalid source IP from clientId={clientId.Value}: expected={FormatIp(session.AdvertisedHostIpv4)}, got={FormatIp((IPv4)info.SourceAddress)}");
+                _logger.w($"Invalid source IP from host={hostIp}: expected={session.AdvertisedHostIpv4}, got={(IPv4)info.SourceAddress}");
                 return;
             }
         }
@@ -176,11 +164,10 @@ public class ServerHub : IServerHub, IDisposable
         lock (_lock)
         {
             endpoints = new List<IAckRawBaseEndpoint>();
-            foreach (var session in _sessionsByClientId.Values)
+            foreach (var session in _sessions.Values)
                 endpoints.Add(session.Endpoint);
 
-            _sessionsByClientId.Clear();
-            _clientIdByHostIp.Clear();
+            _sessions.Clear();
         }
 
         foreach (var ep in endpoints)
@@ -200,13 +187,11 @@ public class ServerHub : IServerHub, IDisposable
     {
         lock (_lock)
         {
-            foreach (var session in _sessionsByClientId.Values)
+            foreach (var session in _sessions.Values)
                 return session.Endpoint;
             return null;
         }
     }
-
-    private static string FormatIp(IPv4 ip) => ip.ToString();
 
     private sealed class PendingEndpoint : IAckRawBaseEndpoint
     {

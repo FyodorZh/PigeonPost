@@ -19,7 +19,6 @@ public sealed class ClientSideDebugLogic : ClientSideLogic
 
     public ClientSideDebugLogic(
         ITunDevice tun,
-        ClientId clientId,
         IPv4 clientIp,
         IPv4 serverIp,
         string clientUrl,
@@ -29,7 +28,7 @@ public sealed class ClientSideDebugLogic : ClientSideLogic
         bool verbose,
         Queue<byte[]> pending,
         VirtualNetwork network)
-        : base(tun, clientId, clientIp, serverIp, clientUrl, logger,
+        : base(tun, clientIp, serverIp, clientUrl, logger,
                transportFactory, bufferSizeBytes, verbose)
     {
         _pending = pending;
@@ -76,7 +75,7 @@ public sealed class ClientSideDebugLogic : ClientSideLogic
             }
 
             if (!_shutdownRequested)
-                _logger.i($"Client {_clientId} completed: all {MessagesPerClient} messages sent and verified.");
+                _logger.i($"Client {_clientIp} completed: all {MessagesPerClient} messages sent and verified.");
         }
         finally
         {

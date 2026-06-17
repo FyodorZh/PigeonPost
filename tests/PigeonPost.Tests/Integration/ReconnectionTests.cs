@@ -35,7 +35,7 @@ public class ReconnectionTests
         server.Start(_ => { });
 
         var client = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
-        client.Init(new BridgeClientHandler(clientBridge, new ClientHandshake(new ClientId("reconn-c1"), (IPv4)0xC0A80101)));
+        client.Init(new BridgeClientHandler(clientBridge, new ClientHandshake(new IPv4(0xC0A80101))));
         var clientStopped = new ManualResetEventSlim(false);
         client.Start(_ => clientStopped.Set());
 
@@ -58,7 +58,7 @@ public class ReconnectionTests
 
         var client2 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         var clientBridge2 = new RecordingBridge();
-        client2.Init(new BridgeClientHandler(clientBridge2, new ClientHandshake(new ClientId("reconn-c2"), (IPv4)0xC0A80102)));
+        client2.Init(new BridgeClientHandler(clientBridge2, new ClientHandshake(new IPv4(0xC0A80102))));
         var client2Stopped = new ManualResetEventSlim(false);
         client2.Start(_ => client2Stopped.Set());
 
@@ -103,7 +103,7 @@ public class ReconnectionTests
         server.Init(new BridgeServerAcknowledger(serverHub));
 
         var client = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
-        client.Init(new BridgeClientHandler(bridgeB, new ClientHandshake(new ClientId("e2e-client"), (IPv4)0x0A630001)));
+        client.Init(new BridgeClientHandler(bridgeB, new ClientHandshake(new IPv4(0x0A630001))));
 
         server.Start(_ => { });
         client.Start(_ => { });
@@ -123,7 +123,7 @@ public class ReconnectionTests
         Thread.Sleep(200);
 
         var client2 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
-        var handler2 = new BridgeClientHandler(bridgeB, new ClientHandshake(new ClientId("e2e-client"), (IPv4)0x0A630001));
+        var handler2 = new BridgeClientHandler(bridgeB, new ClientHandshake(new IPv4(0x0A630001)));
         client2.Init(handler2);
         client2.Start(_ => { });
 
@@ -157,7 +157,7 @@ public class ReconnectionTests
 
         public TestServerHub(ILogger logger) : base(logger) { }
 
-        public override void OnPacketFromClient(ClientId clientId, byte[] packet)
+        public override void OnPacketFromClient(IPv4 clientId, byte[] packet)
         {
             lock (_lock) ReceivedPackets.Add((byte[])packet.Clone());
             base.OnPacketFromClient(clientId, packet);

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Pontifex.Abstractions.Endpoints;
 using PigeonPost.Bridge;
+using PigeonPost.Tun;
 using Scriba;
 
 namespace PigeonPost.Bridge.Tests.Pontifex;
@@ -15,15 +16,15 @@ internal class TestServerHub : ServerHub
     {
     }
 
-    public override void ActivateSessionEndpoint(ClientId clientId, IAckRawBaseEndpoint endpoint)
+    public override void ActivateSessionEndpoint(IPv4 hostIp, IAckRawBaseEndpoint endpoint)
     {
         lock (_lock) ActivatedEndpoints.Add(endpoint);
-        base.ActivateSessionEndpoint(clientId, endpoint);
+        base.ActivateSessionEndpoint(hostIp, endpoint);
     }
 
-    public override void OnPacketFromClient(ClientId clientId, byte[] packet)
+    public override void OnPacketFromClient(IPv4 hostIp, byte[] packet)
     {
         lock (_lock) ReceivedPackets.Add((byte[])packet.Clone());
-        base.OnPacketFromClient(clientId, packet);
+        base.OnPacketFromClient(hostIp, packet);
     }
 }

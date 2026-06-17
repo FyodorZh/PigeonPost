@@ -4,6 +4,7 @@ using Actuarius.Memory;
 using Pontifex;
 using Pontifex.Abstractions;
 using Pontifex.Abstractions.Clients;
+using PigeonPost.Bridge;
 using PigeonPost.Tun;
 using Scriba;
 
@@ -11,12 +12,11 @@ namespace PigeonPost.Bridge;
 
 public class ClientSideLogic
 {
-    protected readonly ClientId _clientId;
     protected readonly IPv4 _clientIp;
     protected readonly IPv4 _serverIp;
     protected readonly ILogger _logger;
 
-    public event Action<ClientId>? Stopped;
+    public event Action? Stopped;
 
     private readonly ITunDevice _tun;
     private readonly string _clientUrl;
@@ -33,7 +33,6 @@ public class ClientSideLogic
 
     public ClientSideLogic(
         ITunDevice tun,
-        ClientId clientId,
         IPv4 clientIp,
         IPv4 serverIp,
         string clientUrl,
@@ -43,7 +42,6 @@ public class ClientSideLogic
         bool verbose)
     {
         _tun = tun;
-        _clientId = clientId;
         _clientIp = clientIp;
         _serverIp = serverIp;
         _clientUrl = clientUrl;
@@ -51,9 +49,9 @@ public class ClientSideLogic
         _transportFactory = transportFactory;
         _bufferSizeBytes = bufferSizeBytes;
         _verbose = verbose;
-        
-        _handshake = new ClientHandshake(_clientId, _clientIp);
-        
+
+        _handshake = new ClientHandshake(_clientIp);
+
         var buffer = new PacketBuffer(_bufferSizeBytes);
         _bridge = new BridgeImpl(_tun, buffer, _logger, _verbose);
         _bridge.OnStopped += OnBridgeStopped;
@@ -76,17 +74,17 @@ public class ClientSideLogic
         if (_stopped)
             return;
 
-        _logger.e($"Client {_clientId}: bridge stopped unexpectedly ({reason.Type}). Fatal.");
+        _logger.e($"Client {_clientIp}: bridge stopped unexpectedly ({reason.Type}). Fatal.");
         _stopped = true;
         _transportStoppedTcs?.TrySetResult();
-        Stopped?.Invoke(_clientId);
+        Stopped?.Invoke();
     }
 
     private async Task ReconnectLoopAsync()
     {
         while (!_stopped)
         {
-            _logger.i($"Client {_clientId} connecting...");
+            _logger.i($"Client {_clientIp} connecting...");
 
             var handler = new BridgeClientHandler(_bridge!, _handshake!);
 
@@ -95,7 +93,7 @@ public class ClientSideLogic
                 var transport = _transportFactory.Construct(_clientUrl, _logger, MemoryRental.Shared);
                 if (transport is not IAckRawClient ackClient)
                 {
-                    _logger.e($"Client {_clientId}: constructed transport is not IAckRawClient.");
+                    _logger.e($"Client {_clientIp}: constructed transport is not IAckRawClient.");
                     break;
                 }
 
@@ -105,7 +103,7 @@ public class ClientSideLogic
                 _transportStoppedTcs = new TaskCompletionSource();
                 ackClient.Start(reason =>
                 {
-                    _logger.i($"Client {_clientId} transport stopped: {reason.Type}");
+                    _logger.i($"Client {_clientIp} transport stopped: {reason.Type}");
                     _transportStoppedTcs?.TrySetResult();
                 });
 
@@ -113,7 +111,7 @@ public class ClientSideLogic
             }
             catch (Exception ex)
             {
-                _logger.e($"Client {_clientId}: transport error: {ex.Message}");
+                _logger.e($"Client {_clientIp}: transport error: {ex.Message}");
             }
 
             if (_stopped)
@@ -133,6 +131,6 @@ public class ClientSideLogic
         _bridge?.Stop(StopReason.UserIntention);
         _transport?.Stop(StopReason.UserIntention);
 
-        Stopped?.Invoke(_clientId);
+        Stopped?.Invoke();
     }
 }

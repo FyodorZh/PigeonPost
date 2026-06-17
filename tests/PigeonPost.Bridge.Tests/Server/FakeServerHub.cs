@@ -9,12 +9,11 @@ namespace PigeonPost.Bridge.Tests.Server;
 internal sealed class FakeServerHub : IServerHub
 {
     private readonly object _lock = new();
-    private readonly Dictionary<ClientId, ClientSession> _sessionsByClientId = new();
-    private readonly Dictionary<IPv4, ClientId> _clientIdByHostIp = new();
+    private readonly Dictionary<IPv4, ClientSession> _sessions = new();
 
     public int ActiveSessionCount
     {
-        get { lock (_lock) return _sessionsByClientId.Count; }
+        get { lock (_lock) return _sessions.Count; }
     }
 
     public long DroppedNoRoute { get; private set; }
@@ -30,34 +29,27 @@ internal sealed class FakeServerHub : IServerHub
         session = null;
         lock (_lock)
         {
-            if (_sessionsByClientId.ContainsKey(handshake.ClientId))
-                return SessionRegistrationResult.RejectedDuplicateId;
-
-            if (_clientIdByHostIp.ContainsKey(handshake.AdvertisedHostIpv4))
+            if (_sessions.ContainsKey(handshake.AdvertisedHostIpv4))
                 return SessionRegistrationResult.RejectedDuplicateHostIp;
 
             var fakeEndpoint = new FakeEndpoint();
-            session = new ClientSession(handshake.ClientId, handshake.AdvertisedHostIpv4, fakeEndpoint);
+            session = new ClientSession(handshake.AdvertisedHostIpv4, fakeEndpoint);
 
-            _sessionsByClientId[handshake.ClientId] = session;
-            _clientIdByHostIp[handshake.AdvertisedHostIpv4] = handshake.ClientId;
+            _sessions[handshake.AdvertisedHostIpv4] = session;
 
-            if (!PacketsSentToClient.ContainsKey(handshake.ClientId.Value))
-                PacketsSentToClient[handshake.ClientId.Value] = new List<byte[]>();
+            string ipStr = handshake.AdvertisedHostIpv4.ToString();
+            if (!PacketsSentToClient.ContainsKey(ipStr))
+                PacketsSentToClient[ipStr] = new List<byte[]>();
 
             return SessionRegistrationResult.Accepted;
         }
     }
 
-    public void RemoveSession(ClientId clientId)
+    public void RemoveSession(IPv4 hostIp)
     {
         lock (_lock)
         {
-            if (_sessionsByClientId.TryGetValue(clientId, out var session))
-            {
-                _clientIdByHostIp.Remove(session.AdvertisedHostIpv4);
-                _sessionsByClientId.Remove(clientId);
-            }
+            _sessions.Remove(hostIp);
         }
     }
 
@@ -77,21 +69,19 @@ internal sealed class FakeServerHub : IServerHub
 
         lock (_lock)
         {
-            if (_clientIdByHostIp.TryGetValue((IPv4)dest, out var clientId))
+            if (_sessions.TryGetValue((IPv4)dest, out var session))
             {
-                if (_sessionsByClientId.TryGetValue(clientId, out _))
-                {
-                    if (PacketsSentToClient.TryGetValue(clientId.Value, out var list))
-                        list.Add(packet);
-                    return;
-                }
+                string ipStr = session.AdvertisedHostIpv4.ToString();
+                if (PacketsSentToClient.TryGetValue(ipStr, out var list))
+                    list.Add(packet);
+                return;
             }
         }
 
         DroppedNoRoute++;
     }
 
-    public void OnPacketFromClient(ClientId clientId, byte[] packet)
+    public void OnPacketFromClient(IPv4 hostIp, byte[] packet)
     {
         if (!TryParseIpv4Addresses(packet, out uint source, out _))
         {
@@ -107,9 +97,9 @@ internal sealed class FakeServerHub : IServerHub
 
         lock (_lock)
         {
-            if (_sessionsByClientId.TryGetValue(clientId, out var session))
+            if (_sessions.TryGetValue(hostIp, out var session))
             {
-                if (source != session.AdvertisedHostIpv4)
+                if (source != session.AdvertisedHostIpv4.Value)
                 {
                     DroppedInvalidSource++;
                     return;
@@ -152,8 +142,7 @@ internal sealed class FakeServerHub : IServerHub
     {
         lock (_lock)
         {
-            _sessionsByClientId.Clear();
-            _clientIdByHostIp.Clear();
+            _sessions.Clear();
         }
     }
 }

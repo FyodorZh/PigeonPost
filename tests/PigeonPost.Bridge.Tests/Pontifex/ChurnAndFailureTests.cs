@@ -42,7 +42,7 @@ public class ChurnAndFailureTests
             var client = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
             clients.Add(client);
             client.Init(new BridgeClientHandler(bridge,
-                new ClientHandshake(new ClientId($"churn-{i}"), (IPv4)(uint)(0xC0A80101 + i))));
+                new ClientHandshake(new IPv4((uint)(0xC0A80101 + i)))));
 
             var signal = new ManualResetEventSlim(false);
             signals.Add(signal);
@@ -63,38 +63,6 @@ public class ChurnAndFailureTests
     }
 
     [Test]
-    public void TwoClients_SameId_Concurrent_OnlyOneAccepted()
-    {
-        string name = NextName();
-        var hub = new ServerHub(StaticLogger.Instance);
-        var server = new AckRawDirectServer(name, StaticLogger.Instance, MemoryRental.Shared);
-        server.Init(new BridgeServerAcknowledger(hub));
-        server.Start(_ => { });
-
-        var bridge1 = new FakeBridge();
-        var client1 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
-        client1.Init(new BridgeClientHandler(bridge1,
-            new ClientHandshake(new ClientId("same-id"), (IPv4)0xC0A80101)));
-
-        var bridge2 = new FakeBridge();
-        var client2 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
-        client2.Init(new BridgeClientHandler(bridge2,
-            new ClientHandshake(new ClientId("same-id"), (IPv4)0xC0A80102)));
-
-        var cs1 = new ManualResetEventSlim(false);
-        var cs2 = new ManualResetEventSlim(false);
-        client1.Start(_ => cs1.Set());
-        client2.Start(_ => cs2.Set());
-
-        Thread.Sleep(300);
-
-        Assert.That(hub.ActiveSessionCount, Is.EqualTo(1));
-
-        client1.Stop(); client2.Stop();
-        cs1.Wait(5000); cs2.Wait(5000);
-    }
-
-    [Test]
     public void TwoClients_SameHostIp_Concurrent_OnlyOneAccepted()
     {
         string name = NextName();
@@ -106,12 +74,12 @@ public class ChurnAndFailureTests
         var bridge1 = new FakeBridge();
         var client1 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         client1.Init(new BridgeClientHandler(bridge1,
-            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101)));
+            new ClientHandshake(new IPv4(0xC0A80101))));
 
         var bridge2 = new FakeBridge();
         var client2 = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
         client2.Init(new BridgeClientHandler(bridge2,
-            new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80101)));
+            new ClientHandshake(new IPv4(0xC0A80101))));
 
         var cs1 = new ManualResetEventSlim(false);
         var cs2 = new ManualResetEventSlim(false);
@@ -140,7 +108,7 @@ public class ChurnAndFailureTests
             var bridge = new FakeBridge();
             var client = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
             client.Init(new BridgeClientHandler(bridge,
-                new ClientHandshake(new ClientId($"cycle-{cycle}"), (IPv4)(uint)(0xC0A80101 + cycle))));
+                new ClientHandshake(new IPv4((uint)(0xC0A80101 + cycle)))));
 
             var signal = new ManualResetEventSlim(false);
             client.Start(_ => signal.Set());
@@ -170,7 +138,7 @@ public class ChurnAndFailureTests
             var bridge = new FakeBridge();
             var client = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
             client.Init(new BridgeClientHandler(bridge,
-                new ClientHandshake(new ClientId("reconn-1"), (IPv4)0xC0A80101)));
+                new ClientHandshake(new IPv4(0xC0A80101))));
             var signal = new ManualResetEventSlim(false);
             client.Start(_ => signal.Set());
             Thread.Sleep(100);
@@ -186,7 +154,7 @@ public class ChurnAndFailureTests
             var bridge = new FakeBridge();
             var client = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
             client.Init(new BridgeClientHandler(bridge,
-                new ClientHandshake(new ClientId("reconn-1"), (IPv4)0xC0A80101)));
+                new ClientHandshake(new IPv4(0xC0A80101))));
             var signal = new ManualResetEventSlim(false);
             client.Start(_ => signal.Set());
             Thread.Sleep(100);
@@ -218,7 +186,7 @@ public class ChurnAndFailureTests
             var client = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
             clients.Add(client);
             client.Init(new BridgeClientHandler(bridge,
-                new ClientHandshake(new ClientId($"sc-{i}"), (IPv4)(uint)(0xC0A80101 + i))));
+                new ClientHandshake(new IPv4((uint)(0xC0A80101 + i)))));
 
             var signal = new ManualResetEventSlim(false);
             signals.Add(signal);
@@ -244,15 +212,15 @@ public class ChurnAndFailureTests
         var hub = new ServerHub(StaticLogger.Instance);
 
         hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("vp-client"), (IPv4)0xC0A80101), out _);
+            new ClientHandshake(new IPv4(0xC0A80101)), out _);
 
         byte[] invalidSource = BuildPacket(source: 0xC0A80199, dest: 0x0A000001);
         byte[] validPacket = BuildPacket(source: 0xC0A80101, dest: 0x0A000001);
         byte[] malformed = new byte[] { 0x45 };
 
-        hub.OnPacketFromClient(new ClientId("vp-client"), invalidSource);
-        hub.OnPacketFromClient(new ClientId("vp-client"), validPacket);
-        hub.OnPacketFromClient(new ClientId("vp-client"), malformed);
+        hub.OnPacketFromClient(new IPv4(0xC0A80101), invalidSource);
+        hub.OnPacketFromClient(new IPv4(0xC0A80101), validPacket);
+        hub.OnPacketFromClient(new IPv4(0xC0A80101), malformed);
 
         Assert.That(hub.DroppedInvalidSource, Is.EqualTo(1));
         Assert.That(hub.DroppedMalformedIpv4, Is.EqualTo(1));

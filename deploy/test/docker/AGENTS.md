@@ -4,7 +4,7 @@
 
 `run-test.sh` orchestrates an integration test of PigeonPost's **1-to-many** server
 model using Docker. It stands up one PigeonPost server, four PigeonPost clients (each
-with unique IP and client identity), and five iperf3 sidecars — one server-side and
+with unique IP identity), and five iperf3 sidecars — one server-side and
 four client-side — then runs concurrent throughput tests on separate ports.
 
 ## Architecture
@@ -34,9 +34,9 @@ four client-side — then runs concurrent throughput tests on separate ports.
   │  client-1     │   │  client-2    │   │  client-3     │
   │  TUN          │   │  TUN         │   │  TUN          │  ...
   │  10.0.0.2/30  │   │  10.0.0.6/30│   │  10.0.0.9/30  │
-  │  --client-id  │   │  --client-id │   │  --client-id  │
-  │  pp-test-     │   │  pp-test-    │   │  pp-test-     │
-  │  client-1     │   │  client-2    │   │  client-3     │
+   │  (IP identity)│   │(IP identity) │   │ (IP identity) │
+   │  TUN IP=      │   │ TUN IP=      │   │ TUN IP=       │
+   │  10.0.0.2     │   │ 10.0.0.6     │   │ 10.0.0.9      │
   └───────┬───────┘   └──────┬───────┘   └──────┬───────┘
           │  port 5201      │  port 5202       │  port 5203
   ┌───────┴───────┐   ┌──────┴───────┐   ┌───────┴───────┐
@@ -91,18 +91,18 @@ inspection. To clean up fully, run `docker compose down` manually.
 | Service | Count | Role |
 |---------|-------|------|
 | `server` | 1 | PigeonPost server, TCP listener on :9000, TUN 10.0.0.1 |
-| `client-1`–`client-4` | 4 | PigeonPost clients, TUNs 10.0.0.2/6/9/13, client-ids `pp-test-client-1`–`4` |
+| `client-1`–`client-4` | 4 | PigeonPost clients, TUNs 10.0.0.2/6/9/13, identified by TUN IP |
 | `iperf-server` | 1 | 4 iperf3 daemons (ports 5201–5204), all bound to 10.0.0.1, `network_mode: "service:server"` |
 | `iperf-client-1`–`iperf-client-4` | 4 | iperf3 clients, each on dedicated port, `network_mode: "service:client-N"` |
 
 ## Client mapping
 
-| Client | TUN IP | client-id | iperf sidecar | iperf3 port |
-|--------|--------|-----------|---------------|-------------|
-| `client-1` | 10.0.0.2 | `pp-test-client-1` | `iperf-client-1` | 5201 |
-| `client-2` | 10.0.0.6 | `pp-test-client-2` | `iperf-client-2` | 5202 |
-| `client-3` | 10.0.0.9 | `pp-test-client-3` | `iperf-client-3` | 5203 |
-| `client-4` | 10.0.0.13 | `pp-test-client-4` | `iperf-client-4` | 5204 |
+| Client | TUN IP | iperf sidecar | iperf3 port |
+|--------|--------|---------------|-------------|
+| `client-1` | 10.0.0.2 | `iperf-client-1` | 5201 |
+| `client-2` | 10.0.0.6 | `iperf-client-2` | 5202 |
+| `client-3` | 10.0.0.9 | `iperf-client-3` | 5203 |
+| `client-4` | 10.0.0.13 | `iperf-client-4` | 5204 |
 
 Each iperf-client connects to its own port, enabling all four to run
 concurrently. iperf3's `-s` mode is single-threaded — it handles one test at

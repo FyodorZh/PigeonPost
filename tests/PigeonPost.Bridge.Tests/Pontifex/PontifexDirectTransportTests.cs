@@ -217,13 +217,13 @@ public class PontifexDirectTransportTests
 
     private static ClientHandshake MakeTestHandshake(string clientId = "test-client")
     {
-        return new ClientHandshake(new ClientId(clientId), (IPv4)0xC0A80101);
+        return new ClientHandshake(new IPv4(0xC0A80101));
     }
 
     private static AckRawDirectClient CreateClient(string name, FakeBridge clientBridge, string clientId = "test-client")
     {
         var client = new AckRawDirectClient(name, StaticLogger.Instance, MemoryRental.Shared);
-        var handshake = new ClientHandshake(new ClientId(clientId), (IPv4)0xC0A80101);
+        var handshake = new ClientHandshake(new IPv4(0xC0A80101));
         client.Init(new BridgeClientHandler(clientBridge, handshake));
         return client;
     }

@@ -51,7 +51,7 @@ public class DebugModeEndToEndTests
         _server.Init(new BridgeServerAcknowledger(_serverHub));
 
         _client = new AckRawDirectClient(DirectServerName, StaticLogger.Instance, MemoryRental.Shared);
-        _client.Init(new BridgeClientHandler(_bridgeB, new ClientHandshake(new ClientId("debug-client"), (IPv4)0x0A630001)));
+        _client.Init(new BridgeClientHandler(_bridgeB, new ClientHandshake(new IPv4(0x0A630001))));
 
         _bridgeA.Start();
         _bridgeB.Start();

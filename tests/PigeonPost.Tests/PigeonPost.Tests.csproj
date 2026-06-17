@@ -14,7 +14,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\PigeonPost.Tun\PigeonPost.Tun.csproj" />
-    <ProjectReference Include="..\..\src\PigeonPost.Bridge\PigeonPost.Bridge.csproj" />
     <ProjectReference Include="..\..\src\PigeonPost\PigeonPost.csproj" />
   </ItemGroup>
 </Project>

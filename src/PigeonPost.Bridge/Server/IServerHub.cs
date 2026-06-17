@@ -1,13 +1,14 @@
 using Pontifex;
+using PigeonPost.Tun;
 
 namespace PigeonPost.Bridge;
 
 public interface IServerHub
 {
     SessionRegistrationResult TryRegisterSession(ClientHandshake handshake, out ClientSession? session);
-    void RemoveSession(ClientId clientId);
+    void RemoveSession(IPv4 hostIp);
     void OnPacketFromTun(byte[] packet);
-    void OnPacketFromClient(ClientId clientId, byte[] packet);
+    void OnPacketFromClient(IPv4 hostIp, byte[] packet);
     void StopAll(StopReason reason);
     int ActiveSessionCount { get; }
     long DroppedNoRoute { get; }

@@ -7,18 +7,18 @@ namespace PigeonPost.Tests;
 public class DebugCliTests
 {
     [Test]
-    public void Client_Role_RequiresClientId_Fails_WhenMissing()
+    public void Client_Role_RequiresTunAndUrl()
     {
         var cfg = CliParser.Parse(new[] { "--role", "client", "--tun", "tun0", "--url", "url" }, TextWriter.Null);
-        Assert.That(cfg, Is.Null);
+        Assert.That(cfg, Is.Not.Null);
+        Assert.That(cfg!.Role, Is.EqualTo(Role.Client));
     }
 
     [Test]
-    public void Client_Role_WithClientId_Parses()
+    public void Client_Role_MissingTun_Fails()
     {
-        var cfg = CliParser.Parse(new[] { "--role", "client", "--client-id", "my-client", "--tun", "tun0", "--url", "url" }, TextWriter.Null);
-        Assert.That(cfg, Is.Not.Null);
-        Assert.That(cfg!.ClientId, Is.EqualTo("my-client"));
+        var cfg = CliParser.Parse(new[] { "--role", "client", "--url", "url" }, TextWriter.Null);
+        Assert.That(cfg, Is.Null);
     }
 
     [Test]
@@ -49,6 +49,6 @@ public class DebugCliTests
     {
         var cfg = CliParser.Parse(new[] { "--role", "server", "--tun", "tun0", "--url", "url" }, TextWriter.Null);
         Assert.That(cfg, Is.Not.Null);
-        Assert.That(cfg!.ClientId, Is.Null);
+        Assert.That(cfg!.Role, Is.EqualTo(Role.Server));
     }
 }

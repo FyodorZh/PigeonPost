@@ -6,8 +6,6 @@ cd "$(dirname "$0")/../.."
 PIGEON_URL="tcp|203.0.113.10:9000/30"
 export PIGEON_URL
 
-CLIENT_ID="${CLIENT_ID:-pp-client-1}"
-
 TUN_NAME="tun0"
 TUN_IP="10.0.0.2"
 PEER_IP="10.0.0.1"
@@ -32,4 +30,4 @@ if ! ip route show dev "$TUN_NAME" | grep -qF "$PEER_IP"; then
     ip route add "$PEER_IP/32" dev "$TUN_NAME"
 fi
 
-exec dotnet /app/PigeonPost.dll --role client --client-id "$CLIENT_ID" --tun "$TUN_NAME" --url "$PIGEON_URL"
+exec dotnet /app/PigeonPost.dll --role client --tun "$TUN_NAME" --url "$PIGEON_URL"

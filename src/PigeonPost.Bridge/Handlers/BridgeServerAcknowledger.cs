@@ -17,7 +17,7 @@ internal sealed class BridgeServerAcknowledger : IRawServerAcknowledger<BridgeSe
     {
         ClientHandshake? handshake = null;
         HandshakeRejectCode rejectCode = HandshakeRejectCode.InvalidHandshake;
-        
+
         using var disposer = ackData.AsDisposable();
 
         if (ackData.TryPopFirst(out IMultiRefReadOnlyByteArray? data))
@@ -28,7 +28,7 @@ internal sealed class BridgeServerAcknowledger : IRawServerAcknowledger<BridgeSe
             {
                 return new BridgeServerHandler(_hub, null, rejectCode);
             }
-            
+
             handshake = HandshakeCodec.DecodeRequest(handshakeBytes);
         }
 
@@ -40,9 +40,7 @@ internal sealed class BridgeServerAcknowledger : IRawServerAcknowledger<BridgeSe
         switch (result)
         {
             case SessionRegistrationResult.Accepted:
-                return new BridgeServerHandler(_hub, handshake, null);
-            case SessionRegistrationResult.RejectedDuplicateId:
-                return new BridgeServerHandler(_hub, null, HandshakeRejectCode.DuplicateClientId);
+                return new BridgeServerHandler(_hub, handshake.AdvertisedHostIpv4, null);
             case SessionRegistrationResult.RejectedDuplicateHostIp:
                 return new BridgeServerHandler(_hub, null, HandshakeRejectCode.DuplicateHostIp);
             case SessionRegistrationResult.RejectedServerShuttingDown:

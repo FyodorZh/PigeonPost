@@ -7,6 +7,9 @@ namespace PigeonPost.Bridge.Tests.Server;
 [TestFixture]
 public class ServerHubRoutingTests
 {
+    private static readonly IPv4 IpA = new(0xC0A80101);
+    private static readonly IPv4 IpB = new(0xC0A80102);
+
     private FakeServerHub _hub = null!;
 
     [SetUp]
@@ -18,56 +21,50 @@ public class ServerHubRoutingTests
     [Test]
     public void Packet_DestinedToClientA_SentOnlyToClientA()
     {
-        _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
-        _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102), out _);
+        _hub.TryRegisterSession(new ClientHandshake(IpA), out _);
+        _hub.TryRegisterSession(new ClientHandshake(IpB), out _);
 
         byte[] packet = BuildIpv4Packet(dest: 0xC0A80101, source: 0x0A000001);
 
         _hub.OnPacketFromTun(packet);
 
         Assert.That(_hub.DroppedNoRoute, Is.EqualTo(0));
-        Assert.That(_hub.PacketsSentToClient["client-a"], Has.Count.EqualTo(1));
-        Assert.That(_hub.PacketsSentToClient["client-b"], Has.Count.EqualTo(0));
+        Assert.That(_hub.PacketsSentToClient[IpA.ToString()], Has.Count.EqualTo(1));
+        Assert.That(_hub.PacketsSentToClient[IpB.ToString()], Has.Count.EqualTo(0));
     }
 
     [Test]
     public void Packet_NoMatchingHostRoute_Dropped()
     {
-        _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
+        _hub.TryRegisterSession(new ClientHandshake(IpA), out _);
 
         byte[] packet = BuildIpv4Packet(dest: 0xC0A801FF, source: 0x0A000001);
 
         _hub.OnPacketFromTun(packet);
 
         Assert.That(_hub.DroppedNoRoute, Is.EqualTo(1));
-        Assert.That(_hub.PacketsSentToClient["client-a"], Has.Count.EqualTo(0));
+        Assert.That(_hub.PacketsSentToClient[IpA.ToString()], Has.Count.EqualTo(0));
     }
 
     [Test]
     public void Packet_NoBroadcastBehavior()
     {
-        _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
-        _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102), out _);
+        _hub.TryRegisterSession(new ClientHandshake(IpA), out _);
+        _hub.TryRegisterSession(new ClientHandshake(IpB), out _);
 
         byte[] packet = BuildIpv4Packet(dest: 0xC0A80101, source: 0x0A000001);
 
         _hub.OnPacketFromTun(packet);
 
-        Assert.That(_hub.PacketsSentToClient["client-a"], Has.Count.EqualTo(1));
-        Assert.That(_hub.PacketsSentToClient["client-b"], Has.Count.EqualTo(0));
+        Assert.That(_hub.PacketsSentToClient[IpA.ToString()], Has.Count.EqualTo(1));
+        Assert.That(_hub.PacketsSentToClient[IpB.ToString()], Has.Count.EqualTo(0));
     }
 
     [Test]
     public void DisconnectedClient_RouteDropped()
     {
-        _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
-        _hub.RemoveSession(new ClientId("client-a"));
+        _hub.TryRegisterSession(new ClientHandshake(IpA), out _);
+        _hub.RemoveSession(IpA);
 
         byte[] packet = BuildIpv4Packet(dest: 0xC0A80101, source: 0x0A000001);
 

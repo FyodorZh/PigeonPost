@@ -28,12 +28,12 @@ public class ServerHubRealValidationTests
     [Test]
     public void ClientPacket_SourceEqualsAdvertisedIp_Accepted()
     {
-        var handshake = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
+        var handshake = new ClientHandshake(new IPv4(0xC0A80101));
         _hub.TryRegisterSession(handshake, out _);
 
         byte[] packet = BuildIpv4Packet(source: 0xC0A80101, dest: 0x0A000001);
 
-        _hub.OnPacketFromClient(new ClientId("client-a"), packet);
+        _hub.OnPacketFromClient(new IPv4(0xC0A80101), packet);
 
         Assert.That(_hub.DroppedInvalidSource, Is.EqualTo(0));
         Assert.That(_hub.DroppedMalformedIpv4, Is.EqualTo(0));
@@ -42,12 +42,12 @@ public class ServerHubRealValidationTests
     [Test]
     public void ClientPacket_SourceDiffersFromAdvertisedIp_Dropped()
     {
-        var handshake = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
+        var handshake = new ClientHandshake(new IPv4(0xC0A80101));
         _hub.TryRegisterSession(handshake, out _);
 
         byte[] packet = BuildIpv4Packet(source: 0xC0A80199, dest: 0x0A000001);
 
-        _hub.OnPacketFromClient(new ClientId("client-a"), packet);
+        _hub.OnPacketFromClient(new IPv4(0xC0A80101), packet);
 
         Assert.That(_hub.DroppedInvalidSource, Is.EqualTo(1));
     }
@@ -55,12 +55,12 @@ public class ServerHubRealValidationTests
     [Test]
     public void ClientPacket_MalformedIpv4_Dropped()
     {
-        var handshake = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
+        var handshake = new ClientHandshake(new IPv4(0xC0A80101));
         _hub.TryRegisterSession(handshake, out _);
 
         byte[] packet = new byte[] { 0x45, 0x00 };
 
-        _hub.OnPacketFromClient(new ClientId("client-a"), packet);
+        _hub.OnPacketFromClient(new IPv4(0xC0A80101), packet);
 
         Assert.That(_hub.DroppedMalformedIpv4, Is.EqualTo(1));
     }
@@ -68,13 +68,13 @@ public class ServerHubRealValidationTests
     [Test]
     public void ClientPacket_NonIpv4_Dropped()
     {
-        var handshake = new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101);
+        var handshake = new ClientHandshake(new IPv4(0xC0A80101));
         _hub.TryRegisterSession(handshake, out _);
 
         byte[] packet = new byte[20];
         packet[0] = 0x60;
 
-        _hub.OnPacketFromClient(new ClientId("client-a"), packet);
+        _hub.OnPacketFromClient(new IPv4(0xC0A80101), packet);
 
         Assert.That(_hub.DroppedMalformedIpv4, Is.EqualTo(1));
     }
@@ -83,17 +83,17 @@ public class ServerHubRealValidationTests
     public void MultipleClients_EachValidatedSeparately()
     {
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-a"), (IPv4)0xC0A80101), out _);
+            new ClientHandshake(new IPv4(0xC0A80101)), out _);
         _hub.TryRegisterSession(
-            new ClientHandshake(new ClientId("client-b"), (IPv4)0xC0A80102), out _);
+            new ClientHandshake(new IPv4(0xC0A80102)), out _);
 
         byte[] validA = BuildIpv4Packet(source: 0xC0A80101, dest: 0x0A000001);
         byte[] spoofedB = BuildIpv4Packet(source: 0xC0A80199, dest: 0x0A000002);
         byte[] validB = BuildIpv4Packet(source: 0xC0A80102, dest: 0x0A000002);
 
-        _hub.OnPacketFromClient(new ClientId("client-a"), validA);
-        _hub.OnPacketFromClient(new ClientId("client-b"), spoofedB);
-        _hub.OnPacketFromClient(new ClientId("client-b"), validB);
+        _hub.OnPacketFromClient(new IPv4(0xC0A80101), validA);
+        _hub.OnPacketFromClient(new IPv4(0xC0A80102), spoofedB);
+        _hub.OnPacketFromClient(new IPv4(0xC0A80102), validB);
 
         Assert.That(_hub.DroppedInvalidSource, Is.EqualTo(1));
         Assert.That(_hub.DroppedMalformedIpv4, Is.EqualTo(0));

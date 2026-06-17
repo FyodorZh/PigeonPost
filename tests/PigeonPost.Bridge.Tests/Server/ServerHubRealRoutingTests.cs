@@ -85,7 +85,7 @@ public class ServerHubRealRoutingTests
     {
         var epA = new TrackingEndpoint();
         RegisterAndActivate("client-a", 0xC0A80101, epA);
-        _hub.RemoveSession(new ClientId("client-a"));
+        _hub.RemoveSession(new IPv4(0xC0A80101));
 
         byte[] packet = BuildIpv4Packet(dest: 0xC0A80101, source: 0x0A000001);
 
@@ -109,10 +109,10 @@ public class ServerHubRealRoutingTests
 
     private void RegisterAndActivate(string clientId, uint hostIp, TrackingEndpoint endpoint)
     {
-        var handshake = new ClientHandshake(new ClientId(clientId), (IPv4)hostIp);
+        var handshake = new ClientHandshake(new IPv4(hostIp));
         var result = _hub.TryRegisterSession(handshake, out _);
         Assert.That(result, Is.EqualTo(SessionRegistrationResult.Accepted));
-        _hub.ActivateSessionEndpoint(new ClientId(clientId), endpoint);
+        _hub.ActivateSessionEndpoint(new IPv4(hostIp), endpoint);
     }
 
     private static byte[] BuildIpv4Packet(uint dest, uint source)

@@ -23,7 +23,7 @@ internal sealed class DebugApp : BaseApp
     {
         if (config.Role != Role.Debug)
             throw new ArgumentException("Role must be Debug.", nameof(config));
-        
+
         int clientCount = _config.DebugClientCount;
         string serverUrl = _config.DebugServerUrl;
         string clientUrl = _config.DebugClientUrl;
@@ -38,7 +38,6 @@ internal sealed class DebugApp : BaseApp
         _clientLogics = new List<ClientSideLogic>();
         for (int i = 0; i < clientCount; i++)
         {
-            var clientId = new ClientId($"debug-client-{i + 1}");
             uint ipVal = (uint)(ClientBaseIp.Value + (uint)i);
             var clientIp = new IPv4(ipVal);
             string name = $"client{i}";
@@ -56,30 +55,30 @@ internal sealed class DebugApp : BaseApp
                 for (int j = 0; j < expected.Length; j++)
                 {
                     if (packet[j] != expected[expected.Length - 1 - j])
-                        throw new Exception($"Client {clientId}: response mismatch at byte {j}");
+                        throw new Exception($"Client {clientIp}: response mismatch at byte {j}");
                 }
             });
 
-            _logger.i($"Debug client '{clientId}': virtual IP={FormatIp(ipVal)}");
+            _logger.i($"Debug client: virtual IP={FormatIp(ipVal)}");
 
             var client = new ClientSideDebugLogic(
-                clientTun, clientId, clientIp, ServerIp,
+                clientTun, clientIp, ServerIp,
                 clientUrl, _logger, _clientTransportFactory,
                 _config.BufferSizeBytes, _config.Verbose,
                 pending, _harness.Network);
 
-            client.Stopped += id => RemoveClient(id.Value);
+            client.Stopped += () => RemoveClient(clientIp.ToString());
             _clientLogics.Add(client);
-            AddClient(clientId.Value);
+            AddClient(clientIp.ToString());
         }
-        
+
         _logger.i($"Debug mode starting: {clientCount} virtual client(s), server={serverUrl}");
     }
 
     private void AddClient(string clientId)
     {
         if (!_activeClients.Add(clientId))
-            _logger.w($"Duplicate client ID '{clientId}' in debug mode.");
+            _logger.w($"Duplicate client IP '{clientId}' in debug mode.");
 
         _logger.i($"Debug client '{clientId}' active ({_activeClients.Count} total).");
     }
@@ -112,9 +111,9 @@ internal sealed class DebugApp : BaseApp
             });
 
         await _tcs.Task;
-        
+
         _harness.Dispose();
-        
+
         _logger.i("Debug instance shut down.");
     }
 
