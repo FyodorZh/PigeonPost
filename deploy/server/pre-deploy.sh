@@ -5,6 +5,10 @@
 #
 # Usage: ./setup.sh <wan_interface>
 #
+# Provisions a single VPN client subnet on tun0, NATs it to the WAN,
+# and allows forwarding through the tunnel. All clients (Linux TUN and
+# future endpoint) use unique host IPs from this one subnet.
+#
 set -euo pipefail
 
 WAN_IF="${1:-}"
@@ -39,9 +43,8 @@ if [ -n "${has_error:-}" ]; then
 fi
 
 TUN="tun0"
-TUN_NET="10.0.0.0/30"
-TUN_IP="10.0.0.1"
-PEER_TUN_IP="10.0.0.2"
+TUN_CIDR="10.0.10.1/24"
+TUN_NET="10.0.10.0/24"
 
 echo "=== PigeonPost server setup ==="
 
@@ -51,50 +54,46 @@ if ! ip link show "$TUN" >/dev/null 2>&1; then
     ip tuntap add dev "$TUN" mode tun
 fi
 
-if ! ip addr show dev "$TUN" | grep -qF "$TUN_IP"; then
-    echo "Assigning $TUN_IP/30 to $TUN"
-    ip addr add "$TUN_IP/30" dev "$TUN"
+if ! ip addr show dev "$TUN" | grep -qF "${TUN_CIDR%/*}"; then
+    echo "Assigning $TUN_CIDR to $TUN"
+    ip addr add "$TUN_CIDR" dev "$TUN"
 fi
 
 echo "Bringing $TUN up"
 ip link set "$TUN" up
-
-if ! ip route show dev "$TUN" | grep -qF "$PEER_TUN_IP"; then
-    echo "Adding route to peer $PEER_TUN_IP via $TUN"
-    ip route add "$PEER_TUN_IP/32" dev "$TUN"
-fi
 
 # --- IP forwarding ---
 echo "Enabling IP forwarding"
 sysctl -w net.ipv4.ip_forward=1
 
 # --- NAT: tunnel -> internet ---
-RULE="-t nat -A POSTROUTING -o $WAN_IF -s $TUN_NET -j MASQUERADE"
+NAT_RULE="-t nat -A POSTROUTING -o $WAN_IF -s $TUN_NET -j MASQUERADE"
 if ! iptables -t nat -C POSTROUTING -o "$WAN_IF" -s "$TUN_NET" -j MASQUERADE 2>/dev/null; then
-    echo "Adding NAT rule: $RULE"
-    iptables $RULE
+    echo "Adding NAT rule: $NAT_RULE"
+    iptables $NAT_RULE
 else
     echo "NAT rule already exists"
 fi
 
 # --- FORWARD: allow tunnel traffic through ---
-RULE_FWD_OUT="-A FORWARD -i $TUN -o $WAN_IF -s $TUN_NET -j ACCEPT"
+FWD_OUT="-A FORWARD -i $TUN -o $WAN_IF -s $TUN_NET -j ACCEPT"
 if ! iptables -C FORWARD -i "$TUN" -o "$WAN_IF" -s "$TUN_NET" -j ACCEPT 2>/dev/null; then
-    echo "Adding FORWARD rule: $RULE_FWD_OUT"
-    iptables $RULE_FWD_OUT
+    echo "Adding FORWARD rule: $FWD_OUT"
+    iptables $FWD_OUT
 else
     echo "FORWARD outbound rule already exists"
 fi
 
-RULE_FWD_IN="-A FORWARD -i $WAN_IF -o $TUN -m state --state RELATED,ESTABLISHED -j ACCEPT"
+FWD_IN="-A FORWARD -i $WAN_IF -o $TUN -m state --state RELATED,ESTABLISHED -j ACCEPT"
 if ! iptables -C FORWARD -i "$WAN_IF" -o "$TUN" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
-    echo "Adding FORWARD rule: $RULE_FWD_IN"
-    iptables $RULE_FWD_IN
+    echo "Adding FORWARD rule: $FWD_IN"
+    iptables $FWD_IN
 else
     echo "FORWARD inbound rule already exists"
 fi
 
 echo ""
 echo "Setup complete."
+echo "Server TUN: $TUN_CIDR (subnet $TUN_NET)"
 echo "Note: sysctl and iptables changes are not persistent across reboots."
 echo "      Add sysctl to /etc/sysctl.conf and save iptables with: iptables-save > /etc/iptables/rules.v4"

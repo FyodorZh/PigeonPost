@@ -2,11 +2,11 @@
 
 : ${IPERF_PORT:=5201}
 
-echo "Waiting for 10.0.0.1:$IPERF_PORT..."
+echo "Waiting for 10.0.10.1:$IPERF_PORT..."
 start=$(date +%s)
-while ! iperf3 -c 10.0.0.1 -p "$IPERF_PORT" -t 1 --connect-timeout 3000 >/dev/null 2>&1; do
+while ! iperf3 -c 10.0.10.1 -p "$IPERF_PORT" -t 1 --connect-timeout 3000 >/dev/null 2>&1; do
   if [ "$(( $(date +%s) - start ))" -ge 60 ]; then
-    echo "ERROR: could not reach 10.0.0.1:$IPERF_PORT after 60s"
+    echo "ERROR: could not reach 10.0.10.1:$IPERF_PORT after 60s"
     exit 1
   fi
   sleep 1
@@ -23,7 +23,7 @@ strip_val() {
 }
 
 if [ "$TEST_MODE" = "udp" ]; then
-  result=$(iperf3 -c 10.0.0.1 -p "$IPERF_PORT" -u -b 100M -t 30 -J 2>/dev/null)
+  result=$(iperf3 -c 10.0.10.1 -p "$IPERF_PORT" -u -b 100M -t 30 -J 2>/dev/null)
 
   speed=$(echo "$result" | grep -o '"bits_per_second":[[:space:]]*[0-9.]*' | tail -1 | strip_val)
   lost=$(echo "$result" | grep -o '"lost_packets":[[:space:]]*[0-9]*' | strip_val)
@@ -37,7 +37,7 @@ if [ "$TEST_MODE" = "udp" ]; then
 
   printf "%-9d %-14s %-6s %-6s %-8s\n" "$client_id" "${speed_val}*" "$lost" "$total" "$jitter"
 else
-  result=$(iperf3 -c 10.0.0.1 -p "$IPERF_PORT" -b 100M -t 30 -J 2>/dev/null)
+  result=$(iperf3 -c 10.0.10.1 -p "$IPERF_PORT" -b 100M -t 30 -J 2>/dev/null)
   exit_code=$?
 
   if [ "$exit_code" -ne 0 ]; then

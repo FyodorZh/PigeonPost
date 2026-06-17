@@ -14,7 +14,6 @@ services:
       - /dev/net/tun
     environment:
       TUN_NAME: tun0
-      TUN_IP: 10.0.0.1
-      PEER_IP: 10.0.0.2
+      TUN_CIDR: 10.0.10.1/24
     command: --role server --tun tun0 --url '${PIGEON_URL:?Set PIGEON_URL}'
     restart: unless-stopped

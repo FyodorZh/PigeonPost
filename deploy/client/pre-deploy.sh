@@ -3,15 +3,29 @@
 # One-time host setup for the PigeonPost client machine.
 # Run this once per boot (or integrate into /etc/rc.local / systemd).
 #
-# Usage: ./setup.sh
+# Configures a TUN device with a unique client IP from the VPN subnet,
+# sets up policy routing for ingress traffic, and NATs it through the
+# tunnel to the server.
+#
+# Environment variables (with defaults):
+#   TUN_NAME  — TUN device name  (default: tun0)
+#   TUN_CIDR  — client TUN address, e.g. 10.0.10.11/24  (required)
+#   PEER_IP   — server TUN gateway IP, e.g. 10.0.10.1    (required)
+#
+# Usage: TUN_CIDR=10.0.10.11/24 PEER_IP=10.0.10.1 ./setup.sh
 #
 set -euo pipefail
 
-TUN="tun0"
-TUN_IP="10.0.0.2"
-PEER_TUN_IP="10.0.0.1"
+: "${TUN_CIDR:?TUN_CIDR is required (e.g. 10.0.10.11/24)}"
+: "${PEER_IP:?PEER_IP is required (e.g. 10.0.10.1)}"
+
+TUN_NAME="${TUN_NAME:-tun0}"
+TUN_IP="${TUN_CIDR%/*}"
 
 echo "=== PigeonPost client setup ==="
+echo "  TUN:   $TUN_NAME"
+echo "  CIDR:  $TUN_CIDR"
+echo "  Peer:  $PEER_IP"
 
 # --- ipset for ingress traffic routing ---
 if ! command -v ipset >/dev/null 2>&1; then
@@ -25,22 +39,22 @@ if ! ipset list pp-ingress >/dev/null 2>&1; then
 fi
 
 # --- TUN device ---
-if ! ip link show "$TUN" >/dev/null 2>&1; then
-    echo "Creating TUN device: $TUN"
-    ip tuntap add dev "$TUN" mode tun
+if ! ip link show "$TUN_NAME" >/dev/null 2>&1; then
+    echo "Creating TUN device: $TUN_NAME"
+    ip tuntap add dev "$TUN_NAME" mode tun
 fi
 
-if ! ip addr show dev "$TUN" | grep -qF "$TUN_IP"; then
-    echo "Assigning $TUN_IP/30 to $TUN"
-    ip addr add "$TUN_IP/30" dev "$TUN"
+if ! ip addr show dev "$TUN_NAME" | grep -qF "$TUN_IP"; then
+    echo "Assigning $TUN_CIDR to $TUN_NAME"
+    ip addr add "$TUN_CIDR" dev "$TUN_NAME"
 fi
 
-echo "Bringing $TUN up"
-ip link set "$TUN" up
+echo "Bringing $TUN_NAME up"
+ip link set "$TUN_NAME" up
 
-if ! ip route show dev "$TUN" | grep -qF "$PEER_TUN_IP"; then
-    echo "Adding route to peer $PEER_TUN_IP via $TUN"
-    ip route add "$PEER_TUN_IP/32" dev "$TUN"
+if ! ip route get "$PEER_IP" 2>/dev/null | grep -qF "dev $TUN_NAME"; then
+    echo "Adding route to peer $PEER_IP via $TUN_NAME"
+    ip route add "$PEER_IP/32" dev "$TUN_NAME"
 fi
 
 # --- IP forwarding ---
@@ -48,8 +62,8 @@ echo "Enabling IP forwarding"
 sysctl -w net.ipv4.ip_forward=1
 
 # --- NAT: tunnel -> internet ---
-RULE="-t nat -A POSTROUTING -o $TUN -j MASQUERADE"
-if ! iptables -t nat -C POSTROUTING -o "$TUN" -j MASQUERADE 2>/dev/null; then
+RULE="-t nat -A POSTROUTING -o $TUN_NAME -j MASQUERADE"
+if ! iptables -t nat -C POSTROUTING -o "$TUN_NAME" -j MASQUERADE 2>/dev/null; then
     echo "Adding NAT rule: $RULE"
     iptables $RULE
 else
@@ -66,16 +80,16 @@ else
 fi
 
 # --- FORWARD: allow traffic through the tunnel ---
-FORWARD_TUN_IN="-A FORWARD -o $TUN -j ACCEPT"
-if ! iptables -C FORWARD -o "$TUN" -j ACCEPT 2>/dev/null; then
+FORWARD_TUN_IN="-A FORWARD -o $TUN_NAME -j ACCEPT"
+if ! iptables -C FORWARD -o "$TUN_NAME" -j ACCEPT 2>/dev/null; then
     echo "Adding FORWARD rule: $FORWARD_TUN_IN"
     iptables $FORWARD_TUN_IN
 else
     echo "FORWARD outbound rule already exists"
 fi
 
-FORWARD_TUN_OUT="-A FORWARD -i $TUN -m state --state RELATED,ESTABLISHED -j ACCEPT"
-if ! iptables -C FORWARD -i "$TUN" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
+FORWARD_TUN_OUT="-A FORWARD -i $TUN_NAME -m state --state RELATED,ESTABLISHED -j ACCEPT"
+if ! iptables -C FORWARD -i "$TUN_NAME" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
     echo "Adding FORWARD rule: $FORWARD_TUN_OUT"
     iptables $FORWARD_TUN_OUT
 else
@@ -90,9 +104,9 @@ if ! grep -qxF "$TABLE_ID tunnel" /etc/iproute2/rt_tables 2>/dev/null; then
     echo "$TABLE_ID tunnel" >> /etc/iproute2/rt_tables
 fi
 
-if ! ip route show table $TABLE_ID 2>/dev/null | grep -q "$TUN"; then
-    echo "Adding default route via $PEER_TUN_IP dev $TUN to table $TABLE_ID"
-    ip route add default via "$PEER_TUN_IP" dev "$TUN" table $TABLE_ID
+if ! ip route show table $TABLE_ID 2>/dev/null | grep -q "$TUN_NAME"; then
+    echo "Adding default route via $PEER_IP dev $TUN_NAME to table $TABLE_ID"
+    ip route add default via "$PEER_IP" dev "$TUN_NAME" table $TABLE_ID
 else
     echo "Route already exists"
 fi
@@ -106,5 +120,6 @@ fi
 
 echo ""
 echo "Setup complete."
+echo "Client TUN: $TUN_CIDR (peer $PEER_IP)"
 echo "Note: sysctl and iptables changes are not persistent across reboots."
 echo "      Add sysctl to /etc/sysctl.conf and save iptables with: iptables-save > /etc/iptables/rules.v4"
