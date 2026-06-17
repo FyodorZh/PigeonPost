@@ -1,9 +1,5 @@
-using System;
-using System.Threading;
 using System.Threading.Tasks;
-using Actuarius.Memory;
 using Pontifex;
-using Pontifex.Abstractions;
 using Pontifex.Protocols.Monitoring.AckRaw;
 using Pontifex.Transports.Direct;
 using Pontifex.Transports.Tcp;
@@ -18,9 +14,6 @@ internal abstract class BaseApp
     
     protected readonly BridgeConfiguration _config;
     protected readonly ILogger _logger;
-
-    protected volatile bool _shutdownRequested;
-    private readonly CancellationTokenSource _cts = new();
 
     protected BaseApp(BridgeConfiguration config, ILogger logger)
     {
@@ -38,33 +31,7 @@ internal abstract class BaseApp
 
     public abstract Task RunAsync();
 
-    public virtual void RequestShutdown()
-    {
-        _shutdownRequested = true;
-        _cts.Cancel();
-    }
-
-    protected ITransport CreateTransport(string url, bool isServer)
-    {
-        var factory = isServer ? _serverTransportFactory : _clientTransportFactory;
-        var transport = factory.Construct(url, _logger, MemoryRental.Shared);
-        
-        if (transport == null)
-            throw new InvalidOperationException($"Failed to construct transport from URL: '{url}'");
-        
-        return transport;
-    }
-
-    protected async Task WaitForShutdownAsync()
-    {
-        try
-        {
-            await Task.Delay(Timeout.Infinite, _cts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-    }
+    public abstract void RequestShutdown();
 
     protected static string FormatIp(uint ip)
     {

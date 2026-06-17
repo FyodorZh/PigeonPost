@@ -1,10 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Pontifex;
-using Pontifex.Abstractions;
-using Pontifex.Abstractions.Servers;
-using Pontifex.StopReasons;
-using PigeonPost.Bridge;
 using PigeonPost.Tun;
 using Scriba;
 
@@ -12,60 +7,46 @@ namespace PigeonPost;
 
 internal sealed class ServerApp : BaseApp
 {
+    private readonly TunDevice _tun;
+    private readonly ServerSideLogic _logic;
+    
     public ServerApp(BridgeConfiguration config, ILogger logger) : base(config, logger)
     {
         if (config.Role != Role.Server)
             throw new ArgumentException("Role must be Server.", nameof(config));
+        
+        var tunName = _config.TunNames[0];
+
+        _tun = new TunDevice(tunName);
+        _tun.SetSendBufferSize(1048576);
+        _logger.i($"TUN device '{tunName}' opened.");
+
+        _logic = new ServerSideLogic(
+            _tun,
+            _config.PontifexUrl,
+            _logger,
+            _serverTransportFactory,
+            _config.BufferSizeBytes,
+            _config.Verbose);
+    }
+
+    public override void RequestShutdown()
+    {
+        _logic.Stop();
     }
 
     public override async Task RunAsync()
     {
-        var tunName = _config.TunNames[0];
-
-        using var tun = new TunDevice(tunName);
-        tun.SetSendBufferSize(1048576);
-        _logger.i($"TUN device '{tunName}' opened.");
-
-        var serverHub = new ServerHub(_logger, tun);
-        var buffer = new PacketBuffer(_config.BufferSizeBytes);
-
-        using var bridge = new BridgeImpl(tun, buffer, _logger, _config.Verbose);
-        bridge.SetPacketHandler(packet => serverHub.OnPacketFromTun(packet));
-
-        var transport = CreateTransport(_config.PontifexUrl, isServer: true);
-        if (transport is not IAckRawServer ackServer)
-            throw new InvalidOperationException("Transport is not an IAckRawServer.");
-
-        ackServer.Init(new BridgeServerAcknowledger(serverHub));
-
-        bridge.Start();
-
-        var stopped = new TaskCompletionSource<StopReason>();
-        bridge.OnStopped += reason => stopped.TrySetResult(reason);
-
-        ackServer.Start(reason =>
-        {
-            _logger.i($"Server stopped: {reason.Type}");
-            stopped.TrySetResult(reason);
-        });
+        var stoppedTcs = new TaskCompletionSource();
+        _logic.Stopped += () => stoppedTcs.TrySetResult();
 
         _logger.i("Server running. Accepting clients...");
+        _logic.Start();
 
-        var result = await Task.WhenAny(
-            stopped.Task,
-            WaitForShutdownAsync()
-        );
-
-        if (result == stopped.Task)
-        {
-            _logger.w("Transport stopped unexpectedly. Exiting.");
-        }
-
-        serverHub.StopAccepting();
-        serverHub.StopAll(Pontifex.StopReason.UserIntention);
-        bridge.Stop(Pontifex.StopReason.UserIntention);
-        ackServer.Stop(Pontifex.StopReason.UserIntention);
-        tun.Close();
+        await stoppedTcs.Task;
+        
+        _logic.Stop();
+        _tun.Close();
         _logger.i("Server shut down.");
     }
 }

@@ -27,6 +27,8 @@ public class ClientSideLogic
 
     private BridgeImpl? _bridge;
     private ITransport? _transport;
+    private ClientHandshake? _handshake;
+    private TaskCompletionSource? _transportStoppedTcs;
     private volatile bool _stopped;
 
     public ClientSideLogic(
@@ -60,11 +62,25 @@ public class ClientSideLogic
     {
         var buffer = new PacketBuffer(_bufferSizeBytes);
         _bridge = new BridgeImpl(_tun, buffer, _logger, _verbose);
+        _bridge.OnStopped += OnBridgeStopped;
         _bridge.Start();
+
+        _handshake = new ClientHandshake(_clientId, _clientIp.Value);
 
         _ = ReconnectLoopAsync();
 
         return Task.CompletedTask;
+    }
+
+    private void OnBridgeStopped(StopReason reason)
+    {
+        if (_stopped)
+            return;
+
+        _logger.e($"Client {_clientId}: bridge stopped unexpectedly ({reason.Type}). Fatal.");
+        _stopped = true;
+        _transportStoppedTcs?.TrySetResult();
+        Stopped?.Invoke(_clientId);
     }
 
     private async Task ReconnectLoopAsync()
@@ -73,8 +89,7 @@ public class ClientSideLogic
         {
             _logger.i($"Client {_clientId} connecting...");
 
-            var handshake = new ClientHandshake(_clientId, _clientIp.Value);
-            var handler = new BridgeClientHandler(_bridge!, handshake);
+            var handler = new BridgeClientHandler(_bridge!, _handshake!);
 
             try
             {
@@ -88,14 +103,14 @@ public class ClientSideLogic
                 ackClient.Init(handler);
                 _transport = transport;
 
-                var stoppedTcs = new TaskCompletionSource();
+                _transportStoppedTcs = new TaskCompletionSource();
                 ackClient.Start(reason =>
                 {
                     _logger.i($"Client {_clientId} transport stopped: {reason.Type}");
-                    stoppedTcs.TrySetResult();
+                    _transportStoppedTcs?.TrySetResult();
                 });
 
-                await stoppedTcs.Task;
+                await _transportStoppedTcs.Task;
             }
             catch (Exception ex)
             {

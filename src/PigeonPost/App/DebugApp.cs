@@ -14,26 +14,26 @@ internal sealed class DebugApp : BaseApp
     private static readonly IPv4 ServerIp = new(192, 168, 0, 1);
     private static readonly IPv4 ClientBaseIp = new(192, 168, 0, 2);
 
+    private readonly VirtualTrafficHarness _harness;
+    private readonly ServerSideLogic _serverLogic;
+    private readonly List<ClientSideLogic> _clientLogics;
+
     public DebugApp(BridgeConfiguration config, ILogger logger) : base(config, logger)
     {
         if (config.Role != Role.Debug)
             throw new ArgumentException("Role must be Debug.", nameof(config));
-    }
-
-    public override async Task RunAsync()
-    {
+        
         int clientCount = _config.DebugClientCount;
         string serverUrl = _config.DebugServerUrl;
         string clientUrl = _config.DebugClientUrl;
 
-        using var harness = new VirtualTrafficHarness();
+        _harness = new VirtualTrafficHarness();
 
-        var serverSide = new ServerSideLogic(
-            harness.ServerDevice, serverUrl, _logger, _serverTransportFactory,
+        _serverLogic = new ServerSideLogic(
+            _harness.ServerDevice, serverUrl, _logger, _serverTransportFactory,
             _config.BufferSizeBytes, _config.Verbose);
 
-        var clientSides = new List<ClientSideLogic>();
-
+        _clientLogics = new List<ClientSideLogic>();
         for (int i = 0; i < clientCount; i++)
         {
             var clientId = new ClientId($"debug-client-{i + 1}");
@@ -43,7 +43,7 @@ internal sealed class DebugApp : BaseApp
 
             var pending = new Queue<byte[]>();
 
-            var clientTun = harness.Network.CreateNode(name, clientIp, (fromIp, toIp, packet) =>
+            var clientTun = _harness.Network.CreateNode(name, clientIp, (fromIp, toIp, packet) =>
             {
                 byte[] expected;
                 lock (pending)
@@ -60,42 +60,45 @@ internal sealed class DebugApp : BaseApp
 
             _logger.i($"Debug client '{clientId}': virtual IP={FormatIp(ipVal)}");
 
-            var clientSide = new ClientSideDebugLogic(
+            var client = new ClientSideDebugLogic(
                 clientTun, clientId, clientIp, ServerIp,
                 clientUrl, _logger, _clientTransportFactory,
                 _config.BufferSizeBytes, _config.Verbose,
-                pending, harness.Network);
+                pending, _harness.Network);
 
-            clientSide.Stopped += id => serverSide.RemoveClient(id.Value);
-            clientSides.Add(clientSide);
-            serverSide.AddClient(clientId.Value);
+            client.Stopped += id => _serverLogic.RemoveClient(id.Value);
+            _clientLogics.Add(client);
+            _serverLogic.AddClient(clientId.Value);
         }
+        
+        _logger.i($"Debug mode starting: {clientCount} virtual client(s), server={serverUrl}");
+    }
 
-        serverSide.Start();
+    public override void RequestShutdown()
+    {
+        foreach (var c in _clientLogics)
+        {
+            c.RequestShutdown();
+        }
+    }
 
-        foreach (var c in clientSides)
+    public override async Task RunAsync()
+    {
+        TaskCompletionSource _tcs = new TaskCompletionSource();
+        _serverLogic.Stopped += () => _tcs.TrySetResult();
+        _serverLogic.Start();
+
+        foreach (var c in _clientLogics)
             _ = c.Start().ContinueWith(t =>
             {
                 if (t.IsFaulted)
                     _logger.e($"Client error: {t.Exception?.GetBaseException().Message}");
             });
 
-        _logger.i($"Debug mode running: {clientCount} virtual client(s), server={serverUrl}");
-
-        await Task.WhenAny(
-            serverSide.Completion,
-            WaitForShutdownAsync());
-
-        if (_shutdownRequested)
-        {
-            foreach (var c in clientSides)
-            {
-                c.RequestShutdown();
-                c.Stop();
-            }
-            await serverSide.Completion;
-        }
-
+        await _tcs.Task;
+        
+        _harness.Dispose();
+        
         _logger.i("Debug instance shut down.");
     }
 
@@ -125,5 +128,4 @@ internal sealed class DebugApp : BaseApp
             _cts.Dispose();
         }
     }
-
 }

@@ -1,6 +1,5 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using Actuarius.Memory;
 using Pontifex;
 using Pontifex.Abstractions;
@@ -24,9 +23,9 @@ public sealed class ServerSideLogic
     private BridgeImpl? _bridge;
     private ITransport? _transport;
     private int _activeClients;
-    private readonly TaskCompletionSource _completionTcs = new();
+    private volatile bool _stopped;
 
-    public Task Completion => _completionTcs.Task;
+    public event Action? Stopped;
 
     public ServerSideLogic(
         ITunDevice tun,
@@ -54,7 +53,6 @@ public sealed class ServerSideLogic
         if (Interlocked.Decrement(ref _activeClients) == 0)
         {
             Stop();
-            _completionTcs.TrySetResult();
         }
     }
 
@@ -64,6 +62,7 @@ public sealed class ServerSideLogic
         var buffer = new PacketBuffer(_bufferSizeBytes);
         _bridge = new BridgeImpl(_tun, buffer, _logger, _verbose);
         _bridge.SetPacketHandler(_hub.OnPacketFromTun);
+        _bridge.OnStopped += OnBridgeStopped;
 
         var transport = _transportFactory.Construct(_serverUrl, _logger, MemoryRental.Shared);
         if (transport is not IAckRawServer ackServer)
@@ -73,14 +72,43 @@ public sealed class ServerSideLogic
         _transport = transport;
 
         _bridge.Start();
-        ackServer.Start(reason => _logger.i($"Server transport stopped: {reason.Type}"));
+        ackServer.Start(reason =>
+        {
+            _logger.i($"Server transport stopped: {reason.Type}");
+            OnStopped();
+        });
+    }
+
+    private void OnBridgeStopped(StopReason reason)
+    {
+        if (_stopped)
+            return;
+
+        _logger.e($"Server bridge stopped unexpectedly ({reason.Type}). Fatal.");
+        _stopped = true;
+        Stopped?.Invoke();
+    }
+
+    private void OnStopped()
+    {
+        if (_stopped)
+            return;
+
+        _stopped = true;
+        Stopped?.Invoke();
     }
 
     public void Stop()
     {
+        if (_stopped)
+            return;
+        _stopped = true;
+
         _hub?.StopAccepting();
-        _hub?.StopAll(Pontifex.StopReason.UserIntention);
-        _bridge?.Stop(Pontifex.StopReason.UserIntention);
-        _transport?.Stop(Pontifex.StopReason.UserIntention);
+        _hub?.StopAll(StopReason.UserIntention);
+        _bridge?.Stop(StopReason.UserIntention);
+        _transport?.Stop(StopReason.UserIntention);
+
+        Stopped?.Invoke();
     }
 }
