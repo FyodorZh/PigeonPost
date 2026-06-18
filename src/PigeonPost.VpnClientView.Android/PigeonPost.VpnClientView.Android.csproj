@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>PigeonPost.VpnClientView.Android</RootNamespace>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
+    <ApplicationId>com.pigeonpost.vpnclient</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" Version="11.2.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PigeonPost.VpnClientView\PigeonPost.VpnClientView.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>PigeonPost.VpnClientView.Desktop</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PigeonPost.VpnClientView\PigeonPost.VpnClientView.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,58 @@
+## Stage 01 — Solution Scaffold
+
+### Files Created
+
+**src/PigeonPost.Vpn/**
+- `PigeonPost.Vpn.csproj` — net10.0 class library, refs CommunityToolkit.Mvvm 8.4.0 + Microsoft.Extensions.DependencyInjection 9.0.0
+- `PlaceholderService.cs` — placeholder runtime class
+
+**src/PigeonPost.VpnClientView/**
+- `PigeonPost.VpnClientView.csproj` — shared Avalonia UI with `<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>`
+- `App.axaml` / `App.axaml.cs` — Avalonia Application definition with FluentTheme
+- `Views/MainWindow.axaml` / `Views/MainWindow.axaml.cs` — placeholder window (800x600)
+
+**src/PigeonPost.VpnClientView.Desktop/**
+- `PigeonPost.VpnClientView.Desktop.csproj` — desktop host, OutputType Exe, refs Avalonia.Desktop
+- `Program.cs` — entry point with `BuildAvaloniaApp().StartWithClassicDesktopLifetime(args)`
+
+**src/PigeonPost.VpnClientView.Android/**
+- `PigeonPost.VpnClientView.Android.csproj` — targets `net10.0-android`, refs Avalonia.Android
+- `MainActivity.cs` — extends `AvaloniaMainActivity` with standard Android activity attributes
+
+**tests/PigeonPost.Vpn.Tests/**
+- `PigeonPost.Vpn.Tests.csproj` — NUnit test project, refs PigeonPost.Vpn
+- `PlaceholderTests.cs` — one passing test
+
+**tests/PigeonPost.VpnClientView.Tests/**
+- `PigeonPost.VpnClientView.Tests.csproj` — NUnit test project, refs PigeonPost.VpnClientView
+- `PlaceholderTests.cs` — one passing test
+
+### Solution Changes
+- All 6 new projects added to `PigeonPost.sln` with build configurations for all platforms
+- New test projects nested under the existing `Tests` solution folder
+- `PigeonPost.VpnClientView.Desktop.csproj` has `$(NoWarn)` suppressing NU1903
+
+### NuGet Packages Added
+- Avalonia 11.2.3 (shared UI, desktop host, Android host)
+- Avalonia.Desktop 11.2.3 (desktop host)
+- Avalonia.Themes.Fluent 11.2.3 (shared UI)
+- Avalonia.Android 11.2.3 (Android host)
+- CommunityToolkit.Mvvm 8.4.0 (shared UI, runtime)
+- Microsoft.Extensions.DependencyInjection 9.0.0 (shared UI, runtime)
+- 94 total .nupkg files now in `./nugets/` (was ~60 before)
+
+### Issues Encountered & Resolved
+1. **NU1903 vulnerability warning** — Added `<NoWarn>` to Desktop csproj.
+2. **Android SDK API 36 not installed** — Installed via `dotnet build -t:InstallAndroidDependencies`.
+3. **Java 11 outdated for Android build** — Installed openjdk@17 via Homebrew.
+
+### Verification Results
+```
+dotnet restore              ✓ Success (all 13 projects)
+dotnet build                ✓ Success
+dotnet test Vpn.Tests       ✓ Passed: 1
+dotnet test VpnClientView.Tests ✓ Passed: 1
+dotnet nuget locals all --clear + offline restore ✓ Success
+Original PigeonPost console  ✓ Builds unchanged
+Existing tests               ✓ Passed (109 passed, 8 Linux-only skipped)
+```
