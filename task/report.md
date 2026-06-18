@@ -56,3 +56,41 @@ dotnet nuget locals all --clear + offline restore ✓ Success
 Original PigeonPost console  ✓ Builds unchanged
 Existing tests               ✓ Passed (109 passed, 8 Linux-only skipped)
 ```
+
+## Stage 02 — Shell Navigation
+
+### Files Created (12)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.VpnClientView/ViewModels/MainViewModel.cs` | `ObservableObject` with `[ObservableProperty] _selectedTabIndex` + read-only `DefaultTabIndex = 0` |
+| `src/PigeonPost.VpnClientView/Views/DashboardView.axaml` | Dashboard tab content (placeholder) |
+| `src/PigeonPost.VpnClientView/Views/DashboardView.axaml.cs` | Empty code-behind |
+| `src/PigeonPost.VpnClientView/Views/ConfigView.axaml` | Configuration tab content (placeholder) |
+| `src/PigeonPost.VpnClientView/Views/ConfigView.axaml.cs` | Empty code-behind |
+| `src/PigeonPost.VpnClientView/Views/LogsView.axaml` | Logs tab content (placeholder) |
+| `src/PigeonPost.VpnClientView/Views/LogsView.axaml.cs` | Empty code-behind |
+| `src/PigeonPost.VpnClientView/Views/AboutView.axaml` | About tab content (version info placeholder) |
+| `src/PigeonPost.VpnClientView/Views/AboutView.axaml.cs` | Empty code-behind |
+| `src/PigeonPost.VpnClientView/Styles/Theme.axaml` | Minimal dark theme overrides (TabItem sizing) |
+| `tests/PigeonPost.VpnClientView.Tests/MainViewModelTests.cs` | 4 NUnit tests (default tab, switching, property change) |
+
+### Files Modified (3)
+
+| File | Change |
+|------|--------|
+| `src/PigeonPost.VpnClientView/App.axaml` | Changed `FluentTheme` to dark variant, added `StyleInclude` for Theme.axaml |
+| `src/PigeonPost.VpnClientView/App.axaml.cs` | Creates `MainViewModel` and sets it as `DataContext` on `MainWindow` |
+| `src/PigeonPost.VpnClientView/Views/MainWindow.axaml` | Replaced placeholder with `TabControl` + 4 `TabItem`s containing each view |
+
+### Key Decisions
+- Dark theme set via `RequestedThemeVariant = ThemeVariant.Dark` in code-behind
+- Compiled bindings with `x:DataType` on all root views
+- DataContext set in `App.axaml.cs` to keep code-behind minimal
+- Default tab hardcoded as 0
+
+### Test Results
+```
+PigeonPost.VpnClientView.Tests: Passed: 5 (4 new + 1 placeholder)
+```
+

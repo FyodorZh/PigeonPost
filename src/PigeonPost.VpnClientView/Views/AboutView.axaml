@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PigeonPost.VpnClientView.ViewModels"
+             x:Class="PigeonPost.VpnClientView.Views.AboutView"
+             x:DataType="vm:MainViewModel">
+    <Grid RowDefinitions="Auto,*">
+        <TextBlock Text="About"
+                   FontSize="20"
+                   FontWeight="Bold"
+                   Margin="16" />
+        <StackPanel Grid.Row="1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <TextBlock Text="PigeonPost VPN Client"
+                       FontSize="18"
+                       FontWeight="SemiBold" />
+            <TextBlock Text="Version 1.0.0"
+                       FontSize="14"
+                       Margin="0,8,0,0" />
+        </StackPanel>
+    </Grid>
+</UserControl>

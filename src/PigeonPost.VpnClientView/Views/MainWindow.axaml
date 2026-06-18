@@ -1,11 +1,24 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PigeonPost.VpnClientView.ViewModels"
+        xmlns:views="using:PigeonPost.VpnClientView.Views"
         x:Class="PigeonPost.VpnClientView.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
         Title="PigeonPost VPN Client"
-        Width="800"
-        Height="600">
-    <TextBlock Text="PigeonPost VPN Client"
-               HorizontalAlignment="Center"
-               VerticalAlignment="Center"
-               FontSize="24" />
+        Width="900"
+        Height="650">
+    <TabControl SelectedIndex="{Binding SelectedTabIndex}">
+        <TabItem Header="Dashboard">
+            <views:DashboardView />
+        </TabItem>
+        <TabItem Header="Config">
+            <views:ConfigView />
+        </TabItem>
+        <TabItem Header="Logs">
+            <views:LogsView />
+        </TabItem>
+        <TabItem Header="About">
+            <views:AboutView />
+        </TabItem>
+    </TabControl>
 </Window>

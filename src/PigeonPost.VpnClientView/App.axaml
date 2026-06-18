@@ -3,5 +3,6 @@
              x:Class="PigeonPost.VpnClientView.App">
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="/Styles/Theme.axaml" />
     </Application.Styles>
 </Application>
