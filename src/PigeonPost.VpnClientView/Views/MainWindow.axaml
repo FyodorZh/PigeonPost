@@ -9,13 +9,13 @@
         Height="650">
     <TabControl SelectedIndex="{Binding SelectedTabIndex}">
         <TabItem Header="Dashboard">
-            <views:DashboardView />
+            <views:DashboardView DataContext="{Binding DashboardViewModel}" />
         </TabItem>
         <TabItem Header="Config">
             <views:ConfigView DataContext="{Binding ConfigViewModel}" />
         </TabItem>
         <TabItem Header="Logs">
-            <views:LogsView />
+            <views:LogsView DataContext="{Binding LogsViewModel}" />
         </TabItem>
         <TabItem Header="About">
             <views:AboutView />

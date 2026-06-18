@@ -5,5 +5,7 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <InternalsVisibleTo Include="PigeonPost.Vpn.Tests" />
+    <InternalsVisibleTo Include="PigeonPost.VpnClientView.Tests" />
   </ItemGroup>
 </Project>

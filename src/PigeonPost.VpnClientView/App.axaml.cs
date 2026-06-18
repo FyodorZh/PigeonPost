@@ -22,11 +22,14 @@ public partial class App : Application
         {
             var services = new ServiceCollection();
             services.AddSingleton<IProfileStore, DesktopProfileStore>();
+            services.AddSingleton<IVpnRuntime, FakeVpnRuntime>();
             services.AddSingleton<ConfigViewModel>();
+            services.AddSingleton<DashboardViewModel>();
+            services.AddSingleton<LogsViewModel>();
+            services.AddSingleton<MainViewModel>();
             var provider = services.BuildServiceProvider();
 
-            var configVm = provider.GetRequiredService<ConfigViewModel>();
-            var vm = new MainViewModel(configVm);
+            var vm = provider.GetRequiredService<MainViewModel>();
 
             desktop.MainWindow = new Views.MainWindow
             {

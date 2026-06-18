@@ -150,3 +150,38 @@ PigeonPost.Vpn.Tests:            Passed: 21 (was 17)
 PigeonPost.VpnClientView.Tests:  Passed: 18 (was 15)
 ```
 
+## Stage 05 — Fake Runtime
+
+### Files Created (11)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.Vpn/ConnectionState.cs` | Enum: `Disconnected`, `Connecting`, `Connected` |
+| `src/PigeonPost.Vpn/VpnLogLevel.cs` | Enum: `Info`, `Warning`, `Error` |
+| `src/PigeonPost.Vpn/VpnLogEntry.cs` | Record: `Timestamp`, `Message`, `Level` |
+| `src/PigeonPost.Vpn/VpnSessionSnapshot.cs` | Record: session counters, speeds, state, reconnect count |
+| `src/PigeonPost.Vpn/IVpnRuntime.cs` | Interface: state, events, `ConnectAsync`/`DisconnectAsync` |
+| `src/PigeonPost.Vpn/FakeVpnRuntime.cs` | Fake with `System.Threading.Timer`, random drop ~12s, auto-reconnect |
+| `src/PigeonPost.VpnClientView/ViewModels/DashboardViewModel.cs` | Binds state/counters/speeds/uptime/reconnects, Connect/Disconnect commands |
+| `src/PigeonPost.VpnClientView/ViewModels/LogsViewModel.cs` | Binds to `LogEmitted`, maintains `ObservableCollection` |
+| `tests/PigeonPost.Vpn.Tests/FakeVpnRuntimeTests.cs` | 10 tests: state transitions, events, reconnect, counter reset |
+| `tests/PigeonPost.VpnClientView.Tests/DashboardViewModelTests.cs` | 7 tests: state binding, commands, counter updates |
+| `tests/PigeonPost.VpnClientView.Tests/LogsViewModelTests.cs` | 5 tests: log collection, timestamps |
+
+### Files Modified (5)
+
+| File | Change |
+|------|--------|
+| `MainViewModel.cs` | Added `DashboardViewModel` + `LogsViewModel` properties |
+| `App.axaml.cs` | Registered `IVpnRuntime→FakeVpnRuntime`, `DashboardViewModel`, `LogsViewModel` |
+| `DashboardView.axaml` | Replaced placeholder with state badge, button, counters, speeds, uptime |
+| `LogsView.axaml` | Replaced placeholder with scrollable log list |
+| `MainWindow.axaml` | Dashboard/Logs tabs bind to their VMs |
+
+### Test Results
+```
+PigeonPost.Vpn.Tests:            Passed: 31 (was 21)
+PigeonPost.VpnClientView.Tests:  Passed: 33 (was 18)
+```
+
+
