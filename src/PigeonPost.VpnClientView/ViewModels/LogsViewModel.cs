@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using Avalonia;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using PigeonPost.Vpn;
 
@@ -18,6 +20,9 @@ public sealed partial class LogsViewModel : ObservableObject
 
     private void OnLogEmitted(VpnLogEntry entry)
     {
-        Logs.Add(entry);
+        if (Application.Current?.ApplicationLifetime is not null)
+            Dispatcher.UIThread.Post(() => Logs.Add(entry));
+        else
+            Logs.Add(entry);
     }
 }

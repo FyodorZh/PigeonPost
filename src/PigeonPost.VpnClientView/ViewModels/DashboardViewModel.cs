@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PigeonPost.Vpn;
@@ -12,6 +15,7 @@ public sealed partial class DashboardViewModel : ObservableObject
     private readonly IVpnRuntime _runtime;
     private readonly IProfileStore? _store;
     private readonly VpnProfile? _profile;
+    private readonly SpeedHistoryBuffer _speedHistory = new();
 
     [ObservableProperty]
     private ConnectionState _connectionState = ConnectionState.Disconnected;
@@ -43,6 +47,19 @@ public sealed partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private bool _canDisconnect;
 
+    [ObservableProperty]
+    private IReadOnlyList<double> _sentHistory = Array.Empty<double>();
+
+    [ObservableProperty]
+    private IReadOnlyList<double> _receivedHistory = Array.Empty<double>();
+
+    public string StatusBadgeColor => ConnectionState switch
+    {
+        ConnectionState.Connected => "#4CAF50",
+        ConnectionState.Connecting => "#FF9800",
+        _ => "#9E9E9E"
+    };
+
     public DashboardViewModel(IVpnRuntime runtime, VpnProfile? profile = null, IProfileStore? store = null)
     {
         _runtime = runtime;
@@ -53,9 +70,17 @@ public sealed partial class DashboardViewModel : ObservableObject
         UpdateFromSnapshot(runtime.CurrentSession);
     }
 
+    partial void OnConnectionStateChanged(ConnectionState value)
+    {
+        OnPropertyChanged(nameof(StatusBadgeColor));
+    }
+
     private void OnSessionUpdated(VpnSessionSnapshot snapshot)
     {
-        UpdateFromSnapshot(snapshot);
+        if (Application.Current?.ApplicationLifetime is not null)
+            Dispatcher.UIThread.Post(() => UpdateFromSnapshot(snapshot));
+        else
+            UpdateFromSnapshot(snapshot);
     }
 
     private void UpdateFromSnapshot(VpnSessionSnapshot snapshot)
@@ -82,6 +107,10 @@ public sealed partial class DashboardViewModel : ObservableObject
         BytesReceivedText = FormatBytes(snapshot.BytesReceived);
         SpeedUpText = FormatSpeed(snapshot.SpeedSentBps);
         SpeedDownText = FormatSpeed(snapshot.SpeedReceivedBps);
+
+        _speedHistory.AddSample(snapshot.SpeedSentBps, snapshot.SpeedReceivedBps);
+        SentHistory = _speedHistory.SentHistory;
+        ReceivedHistory = _speedHistory.ReceivedHistory;
 
         if (snapshot.SessionStart is { } start)
         {

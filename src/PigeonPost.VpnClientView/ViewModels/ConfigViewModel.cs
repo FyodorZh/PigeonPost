@@ -7,6 +7,7 @@ namespace PigeonPost.VpnClientView.ViewModels;
 public sealed partial class ConfigViewModel : ObservableObject
 {
     private readonly IProfileStore? _store;
+    private readonly IVpnRuntime? _runtime;
     private bool _loading;
 
     [ObservableProperty]
@@ -14,6 +15,9 @@ public sealed partial class ConfigViewModel : ObservableObject
 
     [ObservableProperty]
     private string _clientIpLastOctet = "11";
+
+    [ObservableProperty]
+    private bool _isReconnectWarningVisible;
 
     public string FullIpPreview
     {
@@ -31,8 +35,9 @@ public sealed partial class ConfigViewModel : ObservableObject
 
     public ObservableCollection<string> Errors { get; } = new();
 
-    public ConfigViewModel(IProfileStore? store = null)
+    public ConfigViewModel(IVpnRuntime? runtime = null, IProfileStore? store = null)
     {
+        _runtime = runtime;
         _store = store;
         _loading = true;
 
@@ -45,6 +50,17 @@ public sealed partial class ConfigViewModel : ObservableObject
 
         _loading = false;
         Revalidate();
+
+        if (runtime is not null)
+        {
+            IsReconnectWarningVisible = runtime.State != ConnectionState.Disconnected;
+            runtime.SessionUpdated += OnSessionUpdated;
+        }
+    }
+
+    private void OnSessionUpdated(VpnSessionSnapshot snapshot)
+    {
+        IsReconnectWarningVisible = snapshot.State != ConnectionState.Disconnected;
     }
 
     partial void OnServerUrlChanged(string value)

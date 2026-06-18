@@ -184,4 +184,51 @@ PigeonPost.Vpn.Tests:            Passed: 31 (was 21)
 PigeonPost.VpnClientView.Tests:  Passed: 33 (was 18)
 ```
 
+## Stage 06 — Monitoring and Polish
+
+### Files Created (6)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.Vpn/SpeedHistoryBuffer.cs` | 30-sample ring buffer with thread-safe `AddSample`, `SentHistory`, `ReceivedHistory` |
+| `src/PigeonPost.VpnClientView/Controls/SpeedChart.cs` | Custom-drawn `Control` with `OnRender` — overlaid sent/received line chart, auto-scaling Y axis |
+| `src/PigeonPost.VpnClientView/Controls/ValueConverters.cs` | `LogLevelToBackgroundConverter` — maps `VpnLogLevel` to colored `SolidColorBrush` |
+| `src/PigeonPost.VpnClientView/ViewModels/AboutViewModel.cs` | Reads assembly `Version`, `AssemblyProductAttribute`, `AssemblyDescriptionAttribute` |
+| `tests/PigeonPost.Vpn.Tests/SpeedHistoryBufferTests.cs` | 7 tests: capacity, wrapping, overflow, thread safety, independence |
+| `tests/PigeonPost.VpnClientView.Tests/AboutViewModelTests.cs` | 6 tests: version, product name, description, build date, assembly metadata |
+
+### Files Modified (14)
+
+| File | Change |
+|------|--------|
+| `PigeonPost.VpnClientView.csproj` | Added `Version`, `Description`, `Product` assembly metadata |
+| `ViewModels/DashboardViewModel.cs` | Added `SpeedHistoryBuffer` + `SentHistory`/`ReceivedHistory` chart data, `StatusBadgeColor` from state |
+| `ViewModels/ConfigViewModel.cs` | Added `IVpnRuntime` param + `IsReconnectWarningVisible` driven by state |
+| `ViewModels/MainViewModel.cs` | Added `AboutViewModel`, `IsWideLayout`/`IsNarrowLayout`, per-tab flags, `UpdateLayout(width)` |
+| `Views/DashboardView.axaml` | Color-coded badge, `SpeedChart`, `AutomationProperties.Name` on buttons |
+| `Views/ConfigView.axaml` | Reconnect warning banner, `AutomationProperties.Name` on inputs |
+| `Views/LogsView.axaml` | Colored level badge via converter, verbosity description |
+| `Views/LogsView.axaml.cs` | Auto-scroll to bottom on `CollectionChanged` |
+| `Views/AboutView.axaml` | Real content from `AboutViewModel` (product, version, description, build) |
+| `Views/MainWindow.axaml` | Adaptive layout: sidebar (≥700px) or top tabs (<700px) |
+| `Views/MainWindow.axaml.cs` | `Resized` handler calls `vm.UpdateLayout(width)` |
+| `App.axaml.cs` | Registered `AboutViewModel` in DI |
+| `tests/ConfigViewModelTests.cs` | Added 4 reconnect warning visibility tests |
+| `tests/MainViewModelTests.cs` | Added `AboutViewModel`, layout/tab-flag tests |
+
+### Test Results
+
+```
+PigeonPost.Vpn.Tests:            Passed: 38 (was 31, +7 new)
+PigeonPost.VpnClientView.Tests:  Passed: 47 (was 33, +14 new)
+PigeonPost.Bridge.Tests:         Passed: 77 (unchanged)
+PigeonPost.Tests:                Passed: 22, Skipped: 8 (unchanged)
+PigeonPost.Tun.Tests:            Passed: 10 (unchanged)
+```
+
+### Issues Encountered & Resolved
+
+1. **Compiled binding scope** — `IsVisible="{Binding IsDashboardTab}"` on child views resolved against child's `x:DataType`. Fixed by wrapping views in `Panel` (no DataType override).
+2. **Backing field vs property** — `MainViewModel` constructor set `_selectedTabIndex = ...` (field), bypassing `OnSelectedTabIndexChanged`. Fixed: use `SelectedTabIndex = ...`.
+3. **Missing `using` directives** — 3 files needed `System`/`System.Threading`/`System.Reflection` imports due to `<ImplicitUsings>false</ImplicitUsings>`.
 

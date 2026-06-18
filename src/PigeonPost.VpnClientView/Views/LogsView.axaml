@@ -2,17 +2,28 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:PigeonPost.VpnClientView.ViewModels"
              xmlns:vpn="using:PigeonPost.Vpn"
+             xmlns:controls="using:PigeonPost.VpnClientView.Controls"
              x:Class="PigeonPost.VpnClientView.Views.LogsView"
              x:DataType="vm:LogsViewModel">
-    <Grid RowDefinitions="Auto,*"
+    <UserControl.Resources>
+        <controls:LogLevelToBackgroundConverter x:Key="LogLevelToBackground" />
+    </UserControl.Resources>
+    <Grid RowDefinitions="Auto,Auto,*,Auto"
           Margin="24">
         <TextBlock Text="Application Logs"
                    FontSize="20"
                    FontWeight="Bold"
-                   Margin="0,0,0,16" />
+                   Margin="0,0,0,8" />
 
-        <ListBox ItemsSource="{Binding Logs}"
-                 Grid.Row="1"
+        <TextBlock Grid.Row="1"
+                   Text="Log levels: Info (white) | Warning (yellow) | Error (red)"
+                   FontSize="11"
+                   Foreground="#888"
+                   Margin="0,0,0,8" />
+
+        <ListBox x:Name="LogList"
+                 ItemsSource="{Binding Logs}"
+                 Grid.Row="2"
                  BorderThickness="1"
                  ScrollViewer.VerticalScrollBarVisibility="Auto">
             <ListBox.ItemTemplate>
@@ -21,14 +32,18 @@
                           Margin="0,2">
                         <TextBlock Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}"
                                    FontFamily="Consolas, monospace"
-                                   FontSize="12" />
+                                   FontSize="12"
+                                   Foreground="#AAA" />
                         <Border Grid.Column="1"
                                 CornerRadius="4"
                                 Padding="4,0"
                                 Margin="8,0"
-                                Opacity="0.7">
+                                Background="{Binding Level, Converter={StaticResource LogLevelToBackground}}"
+                                Opacity="0.9">
                             <TextBlock Text="{Binding Level}"
-                                       FontSize="11" />
+                                       FontSize="11"
+                                       Foreground="White"
+                                       FontWeight="SemiBold" />
                         </Border>
                         <TextBlock Text="{Binding Message}"
                                    Grid.Column="2"
@@ -37,5 +52,12 @@
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
+
+        <TextBlock Grid.Row="3"
+                   Text="Verbosity: all events are recorded. Info = normal, Warning = potential issues, Error = failures."
+                   FontSize="11"
+                   Foreground="#888"
+                   Margin="0,8,0,0"
+                   TextWrapping="Wrap" />
     </Grid>
 </UserControl>

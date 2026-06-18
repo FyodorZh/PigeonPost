@@ -26,6 +26,7 @@ public partial class App : Application
             services.AddSingleton<ConfigViewModel>();
             services.AddSingleton<DashboardViewModel>();
             services.AddSingleton<LogsViewModel>();
+            services.AddSingleton<AboutViewModel>();
             services.AddSingleton<MainViewModel>();
             var provider = services.BuildServiceProvider();
 

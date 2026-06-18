@@ -1,9 +1,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:PigeonPost.VpnClientView.ViewModels"
+             xmlns:controls="using:PigeonPost.VpnClientView.Controls"
              x:Class="PigeonPost.VpnClientView.Views.DashboardView"
              x:DataType="vm:DashboardViewModel">
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*"
           ColumnDefinitions="*,*"
           Margin="24">
         <TextBlock Text="Dashboard"
@@ -18,16 +19,25 @@
                 Padding="16"
                 Margin="0,0,0,16">
             <StackPanel Spacing="8">
-                <TextBlock Text="{Binding StatusText}"
-                           FontSize="16"
-                           FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Ellipse Fill="{Binding StatusBadgeColor}"
+                             Width="12"
+                             Height="12"
+                             VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding StatusText}"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="16">
                     <Button Content="Connect"
                             Command="{Binding ConnectCommand}"
-                            IsVisible="{Binding CanConnect}" />
+                            IsVisible="{Binding CanConnect}"
+                            AutomationProperties.Name="Connect" />
                     <Button Content="Disconnect"
                             Command="{Binding DisconnectCommand}"
-                            IsVisible="{Binding CanDisconnect}" />
+                            IsVisible="{Binding CanDisconnect}"
+                            AutomationProperties.Name="Disconnect" />
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -85,5 +95,23 @@
                            Margin="8,0,0,0" />
             </Grid>
         </StackPanel>
+
+        <TextBlock Grid.Row="3"
+                   Grid.ColumnSpan="2"
+                   Text="Speed (last 30 seconds)"
+                   FontSize="13"
+                   FontWeight="SemiBold"
+                   Margin="0,8,0,4" />
+
+        <Border Grid.Row="4"
+                Grid.ColumnSpan="2"
+                CornerRadius="8"
+                BorderThickness="1"
+                BorderBrush="#333"
+                Padding="4"
+                Margin="0,0,0,16">
+            <controls:SpeedChart SentData="{Binding SentHistory}"
+                                 ReceivedData="{Binding ReceivedHistory}" />
+        </Border>
     </Grid>
 </UserControl>
