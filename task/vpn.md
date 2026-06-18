@@ -21,7 +21,7 @@ This file should grow over time. When enough uncertainty has been removed, it ca
 
 - Planning is still in progress.
 - The target direction is a new endpoint-style VPN client, not a reuse of the current Linux TUN client runtime.
-- V1 focus is Android only.
+- V1 focus is Android plus a simplified macOS client.
 - iOS is a known future target, but Apple entitlement readiness is still uncertain.
 - The user wants to gather knowledge and de-risk architecture before locking the plan.
 
@@ -29,19 +29,20 @@ This file should grow over time. When enough uncertainty has been removed, it ca
 
 - UI framework will be Avalonia.
 - Target runtime is .NET 10.
-- New shared endpoint runtime project name: `PigeonPost.EndPoint`.
-- New shared/client UI project prefix: `PigeonPost.EPClient.*`.
+- New shared VPN runtime project name: `PigeonPost.Vpn`.
+- New shared/client UI project prefix: `PigeonPost.VpnClientView.*`.
 - The future endpoint client must use the same protocol as the current TUN-based client.
 - The future endpoint client must move raw IPv4 packets, not a new higher-level framed protocol.
 - V1 is IPv4 only.
 - V1 authentication: none.
 - V1 secrets storage: none beyond the minimal local URL persistence requirement.
-- V1 profile model: one locally stored URL, no multiple saved profiles.
+- V1 profile model: one locally stored connection profile, no multiple saved profiles.
 - V1 reconnect behavior: immediate reconnect.
 - V1 UI language: English only.
 - V1 UI requirements:
   - connect/disconnect
   - editable URL
+  - client IP selection from the allowed endpoint/mobile range
   - online/offline state
   - current speed
   - sent/received traffic during current session
@@ -56,12 +57,45 @@ This file should grow over time. When enough uncertainty has been removed, it ca
 - Protocol identity should remain one advertised client IPv4 host address.
 - Device routing model should be default-route VPN on the mobile device.
 - The endpoint runtime should later use the same one-host identity model that the server already understands.
+- Linux TUN clients remain a first-class deployment mode.
+- Existing Linux ingress helpers remain first-class features.
+- V1 endpoint clients should not access Linux TUN peers or other VPN peers.
+- Do not change the current one-host identity rule in V1.
+- Do not implement dynamic IP allocation in V1.
+- Endpoint/mobile IP assignment in V1 should be manual.
+- V1 endpoint/mobile DNS should route through the VPN, use a fixed list of public resolvers, and not be user-configurable.
+- Android V1 should implement a real full-device VPN.
+- macOS V1 should not register a system VPN.
+- macOS V1 should still establish the real Pontifex transport and real handshake using the selected client IP.
+- macOS V1 should generate synthetic ICMP probe traffic through the tunnel automatically while connected.
+- macOS V1 should use `1.1.1.1` as its fixed public IPv4 probe target in V1 and log probe activity periodically.
 
 Important implication:
 
 - "one host" refers to the client's owned IP identity in the PigeonPost protocol
 - "default-route VPN" refers to the device sending all traffic through the VPN
 - these are compatible and should not be confused with each other
+- on macOS V1, UI state `Connected` means the transport/session is connected even though no system VPN is registered
+
+## Current Unified VPN Subnet Preference
+
+- The current deployment model in the repo already uses `10.0.10.0/24` as the unified VPN subnet.
+- The user wants to keep using the `10.0.10.x` space for the foreseeable future.
+- The server VPN/TUN address is fixed at `10.0.10.1`.
+- This subnet choice is currently a planning and deployment convention, not a result of an external network requirement.
+
+Current chosen address-allocation direction:
+
+- reserve `10.0.10.2` through `10.0.10.10` for manually configured Linux TUN clients
+- leave the rest of the subnet available for manually assigned endpoint/mobile clients in V1
+
+Current status:
+
+- this is the current preferred and accepted planning direction
+- endpoint/mobile IP is not encoded in the URL
+- endpoint/mobile IP is selected by the user from the allowed range
+- during connection, the server should reject the selection if that IP is already occupied
+- there is no server-side "available IPs" query in V1
 
 ## Why The Current Client Runtime Is Not Reused
 
@@ -74,6 +108,11 @@ Reasons already identified:
 - The endpoint client will use platform VPN APIs, not the existing Linux TUN setup path.
 
 The correct direction is a new endpoint runtime with shared transport and packet logic but different platform integration points.
+
+For V1, the new runtime must support two different platform behaviors:
+
+- Android: real platform VPN integration with full-device routing
+- macOS: transport-connected probe mode with no registered system VPN
 
 ## Current Repo Facts
 
@@ -154,18 +193,17 @@ What it does today:
 
 - expects a WAN interface argument
 - creates `tun0`
-- assigns `10.0.0.1/30` to `tun0`
+- assigns `10.0.10.1/24` to `tun0`
 - brings `tun0` up
-- adds route `10.0.0.2/32` via `tun0`
 - enables `net.ipv4.ip_forward=1`
-- adds WAN NAT for source subnet `10.0.0.0/30`
+- adds WAN NAT for source subnet `10.0.10.0/24`
 - adds `FORWARD` rules for that tunnel subnet out to WAN and established return traffic back
+- does not install a single-client peer route because the connected `/24` subnet provides return routing for client IPs
 
 Current plain server deploy: `deploy/server/deploy-plain.sh`
 
 - publishes the app
-- provisions `tun0` with `10.0.0.1/30`
-- adds route to `10.0.0.2/32`
+- provisions `tun0` with `10.0.10.1/24`
 - runs `PigeonPost.dll --role server`
 
 Current Docker server deploy:
@@ -177,20 +215,23 @@ Current Docker server deploy:
 Current Docker server environment:
 
 - `TUN_NAME=tun0`
-- `TUN_IP=10.0.0.1`
-- `PEER_IP=10.0.0.2`
+- `TUN_CIDR=10.0.10.1/24`
 
 Current shared entrypoint behavior:
 
 - creates TUN device if needed
-- assigns `$TUN_IP/30`
+- assigns the configured `TUN_CIDR` exactly
 - brings it up
-- adds route `$PEER_IP/32`
+- adds route `$PEER_IP/32` only if `PEER_IP` is provided
 - executes the app
+
+Current verification helper:
+
+- `deploy/server/verify-egress.sh` verifies the unified server egress shape against `10.0.10.0/24`
 
 Important consequence:
 
-- current production server deployment is still fundamentally single-peer in shape
+- current production server deployment is already based on one unified client-capable subnet model
 
 ## Current Production Linux Client Deployment Facts
 
@@ -198,22 +239,24 @@ Current host pre-deploy script: `deploy/client/pre-deploy.sh`
 
 What it does today:
 
-- creates `tun0`
-- assigns `10.0.0.2/30`
-- adds route to `10.0.0.1/32` via `tun0`
+- accepts explicit `TUN_CIDR` and `PEER_IP`
+- defaults to `tun0`
+- defaults to `10.0.10.11/24`
+- adds route to the configured peer via `tun0`
 - enables IP forwarding
 - adds `POSTROUTING -o tun0 -j MASQUERADE`
 - creates `pp-ingress` ipset
 - adds mangle rule marking packets whose source IP belongs to `pp-ingress`
 - adds policy routing table `234`
-- adds default route via `10.0.0.1 dev tun0` in table `234`
+- adds default route via the configured peer in table `234`
 - adds `ip rule fwmark 1 table 234`
 
 Current plain client deploy: `deploy/client/deploy-plain.sh`
 
 - publishes the app
-- provisions `tun0` with `10.0.0.2/30`
-- adds route to `10.0.0.1/32`
+- provisions `tun0` with the configured `TUN_CIDR`
+- defaults to `10.0.10.11/24`
+- adds route to the configured `PEER_IP`
 - runs `PigeonPost.dll --role client`
 
 Current Docker client deploy:
@@ -224,13 +267,14 @@ Current Docker client deploy:
 Current Docker client environment:
 
 - `TUN_NAME=tun0`
-- `TUN_IP=10.0.0.2`
-- `PEER_IP=10.0.0.1`
+- `TUN_CIDR=10.0.10.11/24` by default
+- `PEER_IP=10.0.10.1` by default
+- `CLIENT_ID` exists only as cosmetic output
 
 Important consequence:
 
-- all ready-made production client deployment artifacts are still single-client by default
-- they all point at the same client identity `10.0.0.2`
+- production client deployment artifacts now support explicit per-client identity through `TUN_CIDR`
+- operators still need a documented allocation policy so different clients do not accidentally claim the same IP
 
 ## Why Current Linux Client Works With Strict Source-IP Validation
 
@@ -276,25 +320,26 @@ What it proves:
 
 - the runtime can handle one server plus multiple clients
 - clients can advertise unique TUN IPs such as:
-  - `10.0.0.2`
-  - `10.0.0.6`
-  - `10.0.0.9`
-  - `10.0.0.13`
+  - `10.0.10.11`
+  - `10.0.10.12`
+  - `10.0.10.13`
+  - `10.0.10.14`
+- the unified `/24` subnet on the server provides automatic return routing for those clients
 
 What it does not prove:
 
-- that production deployment artifacts already support multi-client Linux deployment cleanly
+- that the future endpoint/mobile address allocation contract is finalized
 
 Why not:
 
-- the server-side iperf helper manually injects extra `/32` return routes for additional client IPs
-- the shared deployment logic still centers on one peer route and `/30`
-- the client addresses are chosen around the current `/30`-based provisioning behavior, not a clean production network contract
+- it is still a Docker integration harness, not the full future endpoint/mobile deployment path
+- it does not decide how endpoint/mobile clients will obtain their client IPs
 
 Important conclusion:
 
 - runtime multi-client support exists
-- production multi-client deployment support does not yet exist as a clean, documented, first-class capability
+- the repo deployment model now aligns with unified multi-client Linux support
+- the remaining gap is mainly policy and product-contract clarity, especially around endpoint/mobile allocation
 
 ## Avalonia Facts Relevant To Planning
 
@@ -331,6 +376,7 @@ Android V1 requirements already accepted by the user:
 - kill-switch support
 - immediate reconnect
 - live UI status where practical
+- no access to Linux TUN peers or other VPN peers in V1
 
 ## iOS Facts Relevant To Planning
 
@@ -361,21 +407,24 @@ Important future constraint:
 
 - macOS was discussed as a possible fallback if iOS entitlements are delayed.
 - Important conclusion already established: macOS does not really remove the Apple VPN entitlement/capability problem if a real system VPN is required.
-- macOS may still be useful later as:
-  - a real Apple VPN platform once Apple setup is ready
-  - a UI or development host
+- V1 direction has changed from "future desktop only" to a simplified real macOS client in parallel with Android.
+- macOS V1 will not register a system VPN and will not depend on Apple VPN entitlements.
+- macOS V1 will still establish a real Pontifex session and claim a real selected client IP during handshake.
+- macOS V1 should behave as if the VPN module existed from the protocol/config/state perspective.
+- macOS V1 should generate automatic synthetic ICMP probe traffic through the tunnel to exercise server egress and return routing.
+- macOS V1 should use `1.1.1.1` as its fixed public IPv4 probe target in V1 rather than hostname-based probing.
 
 Current V1 decision:
 
-- start with Android only
+- implement Android and simplified macOS simultaneously in V1
 
 ## Architecture Direction Already Discussed
 
 ### Shared Runtime
 
-New shared endpoint runtime project:
+New shared VPN runtime project:
 
-- `PigeonPost.EndPoint`
+- `PigeonPost.Vpn`
 
 Responsibilities expected for this project:
 
@@ -394,7 +443,7 @@ Responsibilities expected for this project:
 
 Shared Avalonia UI project family:
 
-- `PigeonPost.EPClient.*`
+- `PigeonPost.VpnClientView.*`
 
 Expected shared UI responsibilities:
 
@@ -410,12 +459,17 @@ Expected shared UI responsibilities:
 
 Expected direction discussed earlier:
 
-- `PigeonPost.EPClient`
-- `PigeonPost.EPClient.Android`
-- later `PigeonPost.EPClient.iOS`
-- later `PigeonPost.EPClient.iOS.Extension`
+- `PigeonPost.VpnClientView`
+- `PigeonPost.VpnClientView.Android`
+- `PigeonPost.VpnClientView.macOS`
+- later `PigeonPost.VpnClientView.iOS`
+- later `PigeonPost.VpnClientView.iOS.Extension`
 
 The exact project list is still not locked, but this is the current direction.
+
+Important future assumption accepted for planning:
+
+- the real iOS tunnel runtime should be assumed to live in the extension process
 
 ## Suggested Shared Abstraction Direction
 
@@ -435,7 +489,7 @@ Important architecture rule:
 Research result already established:
 
 - the current server can act as internet egress architecturally
-- the current deployment scheme cannot support future full-device endpoint clients cleanly as-is
+- the current deployment scheme in the repo already uses the unified VPN subnet model needed for future endpoint clients
 
 Why it can work in principle:
 
@@ -443,12 +497,12 @@ Why it can work in principle:
 - runtime already accepts client packets for arbitrary destination IPs
 - replies can route back to exact client host identities if Linux routes them into `tun0`
 
-Why it is not good enough as-is:
+What is still unresolved:
 
-- NAT is hard-coded to `10.0.0.0/30`
-- shared provisioning assumes one `/30` address and one peer route
-- there is no dedicated endpoint address pool
-- return routing for many client identities is not a clean production contract today
+- the long-term allocation contract for endpoint/mobile client IPs is not frozen
+- exact endpoint/mobile user experience for selecting an available IP is not frozen
+- the exact fixed public resolver list is not frozen
+- the deployment model is ahead of the planning document and still needs documentation cleanup
 
 Documented follow-up slice:
 
@@ -475,7 +529,7 @@ Updated preferred direction after further analysis:
 
 Reason the preferred direction changed:
 
-- nothing has been implemented yet
+- the unified model has now been implemented in deployment artifacts in the repo
 - the `/30` is a deployment artifact, not a runtime invariant
 - a unified subnet model reduces long-term deployment complexity
 - a unified model avoids dual-path docs, scripts, and testing
@@ -483,13 +537,14 @@ Reason the preferred direction changed:
 Current planning preference:
 
 - the unified replacement model is now preferred over additive compatibility
+- use the current `10.0.10.0/24` deployment as the planning baseline unless a concrete conflict appears later
 
 ## Multiple Linux TUN Deployment Findings
 
 Research result already established:
 
 - the runtime supports multiple Linux TUN clients
-- the production deployment artifacts do not support them cleanly today
+- the production deployment artifacts now support the unified model mechanically
 
 Why runtime support exists:
 
@@ -497,12 +552,11 @@ Why runtime support exists:
 - exact-host routing already works for multiple unique clients
 - Docker integration tests demonstrate multiple distinct client identities at runtime
 
-Why production deployment support does not exist yet:
+What is still missing:
 
-- production client deployment hard-codes `10.0.0.2`
-- `CLIENT_ID` is not real identity
-- shared provisioning is still `/30`-centric
-- production server deployment originally started as single-peer
+- a frozen operator-visible address-allocation contract
+- documentation that clearly explains which addresses are intended for manual Linux TUN clients and which are intended for future endpoint/mobile clients
+- a final documented UI/config contract for manual endpoint/mobile IP assignment
 
 Documented follow-up slice:
 
@@ -519,16 +573,20 @@ This slice now aligns naturally with the updated preferred server direction:
 
 - one unified VPN subnet model
 - no preserved legacy `/30` production path
+- Linux TUN remains a first-class participant in that one subnet model
 
 ## Current Recommended V1 Delivery Direction
 
-- Android only in V1
-- shared endpoint runtime in `PigeonPost.EndPoint`
+- Android plus simplified macOS in V1
+- shared VPN runtime in `PigeonPost.Vpn`
 - shared Avalonia UI with future desktop-friendly layout
+- build shared UI and shared runtime as product foundations, not as Android-only throwaway work
 - test-first, vertical slices
-- replace the legacy `/30` deployment model with one unified client-capable VPN subnet model before Android-specific runtime work
-- complete server and deployment groundwork before Android-specific VPN runtime work
+- use the current unified deployment model as the baseline and document the manual client allocation contract before Android-specific runtime work
+- keep Linux TUN deployment and ingress features as first-class capabilities while adding endpoint/mobile support
 - keep current runtime protocol and validation rules unless a strong reason appears to change them
+- keep V1 endpoint/mobile networking simple: manual client IP, no peer-to-peer access, fixed VPN-routed DNS
+- on macOS V1, validate the transport/protocol path and server egress using automatic synthetic ICMP probe traffic rather than a real system VPN
 
 ## Planning Risks Already Known
 
@@ -538,16 +596,20 @@ This slice now aligns naturally with the updated preferred server direction:
 - Assuming macOS avoids Apple VPN entitlement complexity.
 - Underestimating how much server/networking work is required before full-device endpoint VPN can succeed cleanly.
 - Breaking the current Linux client flow while expanding the server/network contract.
+- Letting the macOS probe mode drift too far from the real shared runtime contract used by Android.
+- Confusing "Connected" transport state on macOS with "system VPN is active".
 
 ## Known Open Questions
 
 These are still unresolved or not yet frozen.
 
-- Exact final project structure for `PigeonPost.EndPoint` and `PigeonPost.EPClient.*`.
+- Exact final project structure for `PigeonPost.Vpn` and `PigeonPost.VpnClientView.*`.
 - Exact shared abstraction/interface set between endpoint runtime and platform hosts.
-- Exact unified VPN client subnet contract to be used long-term.
+- Whether `10.0.10.0/24` should be treated as fully frozen long-term or only as the current stable planning baseline.
+- Exact address-allocation contract inside `10.0.10.0/24`.
+- Exact UI/config contract for manual endpoint/mobile IP selection and local persistence.
+- Which exact fixed public DNS resolvers should be used in V1.
 - Whether macOS should later become a real VPN platform or only a UI/development host first.
-- How future endpoint clients will obtain and persist their unique client IP assignment.
 - Whether any shared logic should be extracted from the current Linux TUN client after the new runtime takes shape.
 
 Questions that are no longer preferred planning directions:
@@ -567,12 +629,39 @@ Current preference on those topics:
 - IPv6 in V1: no.
 - Authentication in V1: no.
 - Multiple user profiles in V1: no.
-- User-editable setting in V1: server URL only.
+- V1 endpoint/mobile profile should contain server URL plus a user-selected client IP from the allowed range.
 - Reconnect behavior in V1: immediate reconnect.
 - Android always-on and kill-switch support: yes.
 - iOS tunnel should continue while UI is closed: yes, eventually.
 - UI should show real-time online/offline state, speed, sent/received counters, and logs: yes.
 - UI should be suitable for future desktop usage: yes.
+- V1 roadmap is Android plus simplified macOS in parallel: yes.
+- Shared runtime project rename: `PigeonPost.Vpn`: yes.
+- Shared UI project family rename: `PigeonPost.VpnClientView.*`: yes.
+- Linux TUN clients remain a first-class deployment mode: yes.
+- Existing ingress helpers remain first-class features: yes.
+- V1 endpoint clients should access internet egress but not Linux TUN peers or other VPN peers: yes.
+- Server VPN IP should be fixed at `10.0.10.1`: yes.
+- Current preferred subnet family remains `10.0.10.x`: yes.
+- Current preferred manual Linux TUN range is `10.0.10.2-10.0.10.10`: yes.
+- V1 endpoint/mobile clients should use manual IP assignment: yes.
+- Dynamic IP allocation is out of scope for V1: yes.
+- The current one-host identity rule should remain unchanged in V1: yes.
+- V1 endpoint/mobile should not provide peer-to-peer access: yes.
+- V1 endpoint/mobile DNS should route through the VPN using a fixed public resolver list and should not be user-configurable: yes.
+- If manual endpoint/mobile IP assignment is chosen in V1, the IP should be visible to the user: yes.
+- V1 endpoint/mobile IP is not encoded in the URL and is selected separately by the user: yes.
+- If the selected endpoint/mobile IP is already occupied, the server should reject the connection attempt: yes.
+- V1 does not include a server-side "available IPs" query before connect: yes.
+- Android V1 should implement a real full-device VPN: yes.
+- macOS V1 should not register a system VPN: yes.
+- macOS V1 should still establish real Pontifex transport and a real handshake with the selected client IP: yes.
+- macOS V1 should use automatic synthetic ICMP probe traffic to exercise the tunnel while connected: yes.
+- macOS V1 fixed public IPv4 probe target is `1.1.1.1`: yes.
+- macOS V1 `Connected` state means transport/session connected, not system VPN active: yes.
+- MTU and similar tunnel-tuning decisions are deferred to V2.
+- Shared UI work should be treated as first-class and not mobile-only: yes.
+- iOS planning may assume the real tunnel runtime lives in the extension: yes.
 
 ## Suggested Future Structure For This File
 
