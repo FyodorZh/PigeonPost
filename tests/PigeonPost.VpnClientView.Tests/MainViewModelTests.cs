@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using PigeonPost.Vpn;
 using PigeonPost.VpnClientView.ViewModels;
 
 namespace PigeonPost.VpnClientView.Tests;
@@ -7,18 +8,23 @@ namespace PigeonPost.VpnClientView.Tests;
 public sealed class MainViewModelTests
 {
     private static ConfigViewModel CreateConfigVm() => new();
-
-    [Test]
-    public void DefaultTabIndex_IsZero()
+    private static ConfigViewModel CreateConfigVmWithProfile()
     {
-        var vm = new MainViewModel(CreateConfigVm());
-        Assert.That(vm.DefaultTabIndex, Is.EqualTo(0));
+        var store = new TestProfileStore(new VpnProfile("tcp|203.0.113.10:9000/30", 15));
+        return new ConfigViewModel(store);
     }
 
     [Test]
-    public void SelectedTabIndex_DefaultsToZero()
+    public void SelectedTabIndex_DefaultsToConfig_WhenNoProfile()
     {
         var vm = new MainViewModel(CreateConfigVm());
+        Assert.That(vm.SelectedTabIndex, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void SelectedTabIndex_DefaultsToDashboard_WhenProfileExists()
+    {
+        var vm = new MainViewModel(CreateConfigVmWithProfile());
         Assert.That(vm.SelectedTabIndex, Is.EqualTo(0));
     }
 

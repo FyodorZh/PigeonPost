@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using PigeonPost.Vpn;
 using PigeonPost.VpnClientView.ViewModels;
 
 namespace PigeonPost.VpnClientView.Tests;
@@ -93,5 +94,30 @@ public sealed class ConfigViewModelTests
 
         vm.ClientIpLastOctet = "1";
         Assert.That(vm.Errors, Is.Not.Empty);
+    }
+
+    [Test]
+    public void LoadsProfile_WhenStoreHasProfile()
+    {
+        var store = new TestProfileStore(new VpnProfile("tcp|203.0.113.10:9000/30", 42));
+        var vm = new ConfigViewModel(store);
+        Assert.That(vm.HasLoadedProfile, Is.True);
+        Assert.That(vm.ServerUrl, Is.EqualTo("tcp|203.0.113.10:9000/30"));
+        Assert.That(vm.ClientIpLastOctet, Is.EqualTo("42"));
+    }
+
+    [Test]
+    public void HasLoadedProfile_False_WhenStoreIsNull()
+    {
+        var vm = new ConfigViewModel();
+        Assert.That(vm.HasLoadedProfile, Is.False);
+    }
+
+    [Test]
+    public void HasLoadedProfile_False_WhenStoreReturnsNull()
+    {
+        var store = new TestProfileStore(null);
+        var vm = new ConfigViewModel(store);
+        Assert.That(vm.HasLoadedProfile, Is.False);
     }
 }

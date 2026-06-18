@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
+using PigeonPost.Vpn;
 using PigeonPost.VpnClientView.ViewModels;
 
 namespace PigeonPost.VpnClientView;
@@ -20,6 +21,7 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var services = new ServiceCollection();
+            services.AddSingleton<IProfileStore, DesktopProfileStore>();
             services.AddSingleton<ConfigViewModel>();
             var provider = services.BuildServiceProvider();
 

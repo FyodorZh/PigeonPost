@@ -124,4 +124,29 @@ PigeonPost.Vpn.Tests:            Passed: 17
 PigeonPost.VpnClientView.Tests:  Passed: 15
 ```
 
+## Stage 04 — Profile Persistence
+
+### Files Created (4)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.Vpn/IProfileStore.cs` | Interface with `Load()` and `Save(VpnProfile)` |
+| `src/PigeonPost.Vpn/DesktopProfileStore.cs` | JSON file in `%APPDATA%/PigeonPost/profile.json` with version field, graceful handling of missing/corrupt files, directory auto-creation |
+| `src/PigeonPost.Vpn/AndroidProfileStore.cs` | Stub — `Load()` returns null, `Save()` is no-op |
+| `tests/PigeonPost.VpnClientView.Tests/TestProfileStore.cs` | In-memory test stub implementing `IProfileStore` |
+
+### Files Modified (4)
+
+| File | Change |
+|------|--------|
+| `ConfigViewModel.cs` | Accepts optional `IProfileStore`, loads on construction, auto-saves on valid changes, exposes `HasLoadedProfile` |
+| `MainViewModel.cs` | Initial tab depends on profile presence: Config (1) if no profile, Dashboard (0) if profile exists |
+| `App.axaml.cs` | Registers `IProfileStore → DesktopProfileStore` in DI |
+| `MainViewModelTests.cs` | Updated tests for profile-dependent tab selection |
+
+### Test Results
+```
+PigeonPost.Vpn.Tests:            Passed: 21 (was 17)
+PigeonPost.VpnClientView.Tests:  Passed: 18 (was 15)
+```
 
