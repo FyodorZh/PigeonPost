@@ -12,7 +12,7 @@
             <views:DashboardView />
         </TabItem>
         <TabItem Header="Config">
-            <views:ConfigView />
+            <views:ConfigView DataContext="{Binding ConfigViewModel}" />
         </TabItem>
         <TabItem Header="Logs">
             <views:LogsView />

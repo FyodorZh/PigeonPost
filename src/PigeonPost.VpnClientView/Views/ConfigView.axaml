@@ -2,18 +2,57 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:PigeonPost.VpnClientView.ViewModels"
              x:Class="PigeonPost.VpnClientView.Views.ConfigView"
-             x:DataType="vm:MainViewModel">
-    <Grid RowDefinitions="Auto,*">
-        <TextBlock Text="Configuration"
+             x:DataType="vm:ConfigViewModel">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+          ColumnDefinitions="Auto,*"
+          Margin="24">
+
+        <TextBlock Text="VPN Configuration"
                    FontSize="20"
                    FontWeight="Bold"
-                   Margin="16" />
-        <StackPanel Grid.Row="1"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
-            <TextBlock Text="VPN connection settings will appear here."
-                       FontSize="14"
-                       TextWrapping="Wrap" />
-        </StackPanel>
+                   Grid.ColumnSpan="2"
+                   Margin="0,0,0,16" />
+
+        <TextBlock Text="Server URL:"
+                   Grid.Row="1"
+                   VerticalAlignment="Center"
+                   Margin="0,0,8,8" />
+        <TextBox Text="{Binding ServerUrl}"
+                 Grid.Row="1"
+                 Grid.Column="1"
+                 Watermark="tcp|host:port/timeout"
+                 MinWidth="300" />
+
+        <TextBlock Text="Client IP last octet (11-254):"
+                   Grid.Row="2"
+                   VerticalAlignment="Center"
+                   Margin="0,8,8,0" />
+        <TextBox Text="{Binding ClientIpLastOctet}"
+                 Grid.Row="2"
+                 Grid.Column="1"
+                 Watermark="11-254"
+                 Margin="0,8,0,0"
+                 MinWidth="100" />
+
+        <TextBlock Text="{Binding FullIpPreview}"
+                   Grid.Row="3"
+                   Grid.Column="1"
+                   FontSize="16"
+                   FontFamily="Consolas, monospace"
+                   Margin="0,8,0,0" />
+
+        <ItemsControl ItemsSource="{Binding Errors}"
+                      Grid.Row="4"
+                      Grid.ColumnSpan="2"
+                      Margin="0,8,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}"
+                               Foreground="Red"
+                               FontSize="12"
+                               Margin="0,2" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </Grid>
 </UserControl>

@@ -9,8 +9,11 @@ public sealed partial class MainViewModel : ObservableObject
 
     public int DefaultTabIndex => 0;
 
-    public MainViewModel()
+    public ConfigViewModel ConfigViewModel { get; }
+
+    public MainViewModel(ConfigViewModel configViewModel)
     {
         _selectedTabIndex = DefaultTabIndex;
+        ConfigViewModel = configViewModel;
     }
 }

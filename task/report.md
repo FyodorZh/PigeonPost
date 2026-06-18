@@ -94,3 +94,34 @@ Existing tests               ✓ Passed (109 passed, 8 Linux-only skipped)
 PigeonPost.VpnClientView.Tests: Passed: 5 (4 new + 1 placeholder)
 ```
 
+## Stage 03 — Profile Validation
+
+### Files Created (7)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.Vpn/VpnProfile.cs` | Sealed record with `ServerUrl`, `ClientIpLastOctet` (byte), computed `FullClientIp` |
+| `src/PigeonPost.Vpn/VpnDefaults.cs` | Static constants: subnet, server TUN IP, reserved ranges, DNS servers |
+| `src/PigeonPost.Vpn/VpnProfileValidator.cs` | Static validator using `[GeneratedRegex]` for URL pattern `type\|host:port/timeout`, validates octet 11-254, returns `List<string>` errors |
+| `src/PigeonPost.VpnClientView/ViewModels/ConfigViewModel.cs` | `ObservableObject` with real-time revalidation via `partial void On*Changed` hooks |
+| `tests/PigeonPost.Vpn.Tests/VpnDefaultsTests.cs` | 5 tests for DNS/subnet/range constants |
+| `tests/PigeonPost.Vpn.Tests/VpnProfileValidatorTests.cs` | 12 tests: valid/invalid URL, octet boundaries, FullIpPreview |
+| `tests/PigeonPost.VpnClientView.Tests/ConfigViewModelTests.cs` | 8 tests: validation state transitions, FullIpPreview, errors |
+
+### Files Modified (5)
+
+| File | Change |
+|------|--------|
+| `ViewModels/MainViewModel.cs` | Added `ConfigViewModel` property + constructor parameter |
+| `App.axaml.cs` | Added DI registration for `ConfigViewModel` |
+| `Views/ConfigView.axaml` | Replaced placeholder with form: URL input, octet input, IP preview, error list |
+| `Views/MainWindow.axaml` | Config tab passes `ConfigViewModel` binding to ConfigView |
+| `MainViewModelTests.cs` | Updated constructor calls, added ConfigViewModel access test |
+
+### Test Results
+```
+PigeonPost.Vpn.Tests:            Passed: 17
+PigeonPost.VpnClientView.Tests:  Passed: 15
+```
+
+
