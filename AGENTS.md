@@ -305,8 +305,9 @@ to one must be mirrored in the other:
 | `deploy/client/deploy-docker.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 | `deploy/client/deploy-plain.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 
-Client deployment artifacts link to the pre-configured `CLIENT_ID` variable.
-Current client helper scripts default `CLIENT_ID` to `pp-client-1` if not set.
+Client deployment artifacts use `TUN_CIDR` and `PEER_IP` for real network identity.
+`CLIENT_ID` is a cosmetic label only — it does not affect the protocol identity.
+Each client must get a **unique** TUN IP from the unified VPN client subnet.
 
 ### Idempotency Requirements
 
@@ -332,9 +333,9 @@ twice and confirm the second run produces zero errors and no duplicate rules or 
 - **Server** (`deploy/server/pre-deploy.sh`): Creates TUN, enables IP forwarding, NAT from tunnel
   subnet to WAN interface (`POSTROUTING -o $WAN_IF -s 10.0.10.0/24`). Provisions the unified
   client subnet (`10.0.10.1/24` on `tun0`) and FORWARD allow rules.
-- **Client** (`deploy/client/pre-deploy.sh`): Creates TUN, enables IP forwarding, NAT to tunnel
-  (`POSTROUTING -o tun0`), sets up ipset `pp-ingress` + mangle rule referencing it, sets up policy
-  routing table 234.
+- **Client** (`deploy/client/pre-deploy.sh`): Creates TUN (default `tun0`), assigns the configured
+  `TUN_CIDR`, adds route to `PEER_IP`, enables IP forwarding, NAT to tunnel (`POSTROUTING -o $TUN_NAME`),
+  sets up ipset `pp-ingress` + mangle rule referencing it, sets up policy routing table 234.
 
 ### Ingress scripts (`deploy/client/ingress/`)
 Ingress scripts register traffic sources (e.g. LAN subnet, PPTP pool, WireGuard peers) into the

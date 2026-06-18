@@ -18,7 +18,7 @@
 #   ping 8.8.8.8 (src 169.254.1.2)
 #   → veth1 → veth0 → PREROUTING matches pp-ingress
 #   → MARK 1 → table 234 → route via tun0
-#   → MASQUERADE (src becomes 10.0.0.2)
+#   → MASQUERADE (src becomes client TUN IP, e.g. 10.0.10.11)
 #   → PigeonPost tunnel → server → internet
 #
 # Return flow is the reverse: internet → server → tunnel → MASQUERADE undo

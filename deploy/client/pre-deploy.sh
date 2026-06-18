@@ -12,7 +12,7 @@
 #   TUN_CIDR  — client TUN address, e.g. 10.0.10.11/24  (required)
 #   PEER_IP   — server TUN gateway IP, e.g. 10.0.10.1    (required)
 #
-# Usage: TUN_CIDR=10.0.10.11/24 PEER_IP=10.0.10.1 ./setup.sh
+# Usage: TUN_CIDR=10.0.10.11/24 PEER_IP=10.0.10.1 ./pre-deploy.sh
 #
 set -euo pipefail
 
