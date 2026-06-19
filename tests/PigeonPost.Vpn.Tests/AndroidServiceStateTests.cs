@@ -118,7 +118,7 @@ internal sealed class TestAndroidServiceBridge : IAndroidServiceBridge
     public AndroidVpnConfiguration? CurrentConfiguration { get; set; }
     public event Action<AndroidServiceState>? ServiceStateChanged;
 
-    public void RequestVpnPermission()
+    public void RequestVpnPermission(VpnProfile profile)
     {
     }
 

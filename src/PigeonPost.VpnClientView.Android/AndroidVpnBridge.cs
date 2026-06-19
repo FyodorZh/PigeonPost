@@ -39,8 +39,10 @@ public sealed class AndroidVpnBridge : IAndroidServiceBridge
         PigeonPostVpnService.OnVpnInterfaceResult += OnVpnInterfaceResult;
     }
 
-    public void RequestVpnPermission()
+    public void RequestVpnPermission(VpnProfile profile)
     {
+        _profile = profile;
+
         if (!_activityRef.TryGetTarget(out var activity))
             return;
 

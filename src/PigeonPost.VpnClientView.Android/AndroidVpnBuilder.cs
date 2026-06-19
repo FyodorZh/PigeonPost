@@ -18,6 +18,7 @@ public static class AndroidVpnBuilder
             builder.AddDnsServer(dns);
         var parts = config.Route.Split('/');
         builder.AddRoute(parts[0], int.Parse(parts[1]));
+        builder.AddDisallowedApplication(service.PackageName!);
         return builder;
     }
 }

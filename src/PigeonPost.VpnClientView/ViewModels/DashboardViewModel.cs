@@ -158,8 +158,14 @@ public sealed partial class DashboardViewModel : ObservableObject
             switch (_androidBridge.ServiceState)
             {
                 case AndroidServiceState.Idle:
+                    var profile = _profile ?? _store?.Load();
+                    if (profile is null)
+                    {
+                        StatusText = "No profile configured";
+                        return;
+                    }
                     _pendingAndroidConnect = true;
-                    _androidBridge.RequestVpnPermission();
+                    _androidBridge.RequestVpnPermission(profile);
                     return;
                 case AndroidServiceState.Preparing:
                     return;

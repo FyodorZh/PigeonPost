@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Android.OS;
 using Java.IO;
 using PigeonPost.Tun;
@@ -36,13 +37,39 @@ public sealed class AndroidTunDevice : ITunDevice
 
     public int Read(byte[] buffer)
     {
-        return _inputStream.Read(buffer, 0, buffer.Length);
+        if (_closed)
+            throw new ObjectDisposedException(Name);
+        try
+        {
+            return _inputStream.Read(buffer, 0, buffer.Length);
+        }
+        catch (Java.IO.IOException ex) when (_closed)
+        {
+            throw new ObjectDisposedException(Name, ex);
+        }
+        catch (Java.IO.IOException ex)
+        {
+            throw new System.IO.IOException("TUN read failed", ex);
+        }
     }
 
     public void Write(byte[] buffer)
     {
-        _outputStream.Write(buffer, 0, buffer.Length);
-        _outputStream.Flush();
+        if (_closed)
+            throw new ObjectDisposedException(Name);
+        try
+        {
+            _outputStream.Write(buffer, 0, buffer.Length);
+            _outputStream.Flush();
+        }
+        catch (Java.IO.IOException ex) when (_closed)
+        {
+            throw new ObjectDisposedException(Name, ex);
+        }
+        catch (Java.IO.IOException ex)
+        {
+            throw new System.IO.IOException("TUN write failed", ex);
+        }
     }
 
     public void Close()
