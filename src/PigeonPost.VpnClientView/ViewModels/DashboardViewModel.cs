@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PigeonPost.Bridge;
 using PigeonPost.Vpn;
 
 namespace PigeonPost.VpnClientView.ViewModels;
@@ -143,6 +144,21 @@ public sealed partial class DashboardViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
+        }
+        catch (HandshakeRejectedException ex)
+        {
+            StatusText = ex.RejectCode switch
+            {
+                HandshakeRejectCode.DuplicateHostIp => "This client IP is already in use on the server",
+                HandshakeRejectCode.InvalidHandshake => "Server rejected our handshake (invalid format)",
+                HandshakeRejectCode.ServerShuttingDown => "Server is shutting down",
+                HandshakeRejectCode.UnsupportedPacketFamily => "Server does not support our packet type",
+                _ => $"Handshake rejected: {ex.RejectCode}"
+            };
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Connection failed: {ex.Message}";
         }
     }
 

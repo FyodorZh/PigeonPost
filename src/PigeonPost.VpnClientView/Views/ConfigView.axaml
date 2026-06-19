@@ -20,10 +20,16 @@
                 Padding="12,8"
                 Margin="0,0,0,12"
                 IsVisible="{Binding IsReconnectWarningVisible}">
-            <TextBlock Text="Warning: Changing settings will interrupt the current VPN session."
-                       Foreground="#FFB74D"
-                       FontSize="13"
-                       TextWrapping="Wrap" />
+            <StackPanel Spacing="4">
+                <TextBlock Text="A session is currently active. Changing settings will disconnect it."
+                           Foreground="#FFB74D"
+                           FontSize="13"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="Disconnecting will end the session immediately."
+                           Foreground="#FF8A65"
+                           FontSize="12"
+                           TextWrapping="Wrap" />
+            </StackPanel>
         </Border>
 
         <TextBlock Text="Server URL:"

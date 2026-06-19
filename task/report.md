@@ -263,3 +263,38 @@ PigeonPost.Vpn.Tests:            Passed: 53 (was 38, +15 new)
 PigeonPost.Bridge.Tests:         Passed: 77 (unchanged)
 ```
 
+## Stage 08 — Desktop macOS Connected Mode
+
+### Files Modified (5)
+
+| File | Change |
+|------|--------|
+| `BridgeClientHandler.cs:33` | Changed to wrap real `HandshakeRejectedException` with actual reject code |
+| `VpnClientRuntime.cs:201-203` | Extract real reject code from inner exception |
+| `DashboardViewModel.cs` | Added `catch (HandshakeRejectedException)` with reject-code-to-message mapping |
+| `DashboardView.axaml` | Added description text: "Connected means transport/session established with server." |
+| `ConfigView.axaml` | Updated reconnect warning banner with clearer wording |
+
+### New Tests (5)
+
+| Test | Description |
+|------|-------------|
+| `Connect_DuplicateHostIp_ShowsClearError` | Maps DuplicateHostIp to readable message |
+| `Connect_InvalidHandshake_ShowsClearError` | Maps InvalidHandshake to readable message |
+| `Connect_ServerShuttingDown_ShowsClearError` | Maps ServerShuttingDown to readable message |
+| `Connect_UnsupportedPacketFamily_ShowsClearError` | Maps UnsupportedPacketFamily to readable message |
+| `Connect_TransportFailure_ShowsConnectionFailed` | Generic transport error handling |
+
+### Test Results
+```
+PigeonPost.VpnClientView.Tests:  Passed: 52 (+5 new)
+PigeonPost.Vpn.Tests:            Passed: 53 (unchanged)
+PigeonPost.Bridge.Tests:         Passed: 77 (unchanged)
+```
+
+### JDK Setup Note
+Correct JDK 17 location for Android builds:
+```
+/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+```
+

@@ -198,9 +198,10 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
             if (reason is Pontifex.StopReasons.ExceptionFail exFail &&
                 exFail.Text.Contains("Handshake rejected"))
             {
-                connectTcs.TrySetException(new HandshakeRejectedException(
-                    HandshakeRejectCode.DuplicateHostIp,
-                    exFail.Text));
+                var code = exFail.Exception is HandshakeRejectedException hre
+                    ? hre.RejectCode
+                    : HandshakeRejectCode.DuplicateHostIp;
+                connectTcs.TrySetException(new HandshakeRejectedException(code, exFail.Text));
             }
             else if (!connectTcs.Task.IsCompleted)
             {

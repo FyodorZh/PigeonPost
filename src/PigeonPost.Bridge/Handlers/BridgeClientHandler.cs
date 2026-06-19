@@ -30,7 +30,7 @@ internal sealed class BridgeClientHandler : IAckRawClientHandler
                 if (ack is { Status: HandshakeAckStatus.Rejected })
                 {
                     _bridge.OnTransportStopped(new Pontifex.StopReasons.ExceptionFail(
-                        "handshake", new System.InvalidOperationException($"Handshake rejected: {ack.RejectCode}"),
+                        "handshake", new HandshakeRejectedException(ack.RejectCode),
                         $"Handshake rejected: {ack.RejectCode}"));
                     return;
                 }

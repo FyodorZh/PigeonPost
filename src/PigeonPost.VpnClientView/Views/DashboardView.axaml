@@ -29,6 +29,10 @@
                                FontWeight="SemiBold"
                                VerticalAlignment="Center" />
                 </StackPanel>
+                <TextBlock Text="Connected means transport/session established with server."
+                           FontSize="11"
+                           Foreground="#888"
+                           TextWrapping="Wrap" />
                 <StackPanel Orientation="Horizontal" Spacing="16">
                     <Button Content="Connect"
                             Command="{Binding ConnectCommand}"

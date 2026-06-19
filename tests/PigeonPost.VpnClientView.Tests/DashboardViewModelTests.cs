@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using PigeonPost.Bridge;
 using PigeonPost.Vpn;
 using PigeonPost.VpnClientView.ViewModels;
 
@@ -117,5 +118,103 @@ public sealed class DashboardViewModelTests
 
         Assert.That(vm.CanConnect, Is.False);
         Assert.That(vm.CanDisconnect, Is.True);
+    }
+
+    [Test]
+    public async Task Connect_DuplicateHostIp_ShowsClearError()
+    {
+        var runtime = new RejectingRuntime(HandshakeRejectCode.DuplicateHostIp);
+        var vm = new DashboardViewModel(runtime, TestProfile);
+
+        await vm.ConnectCommand.ExecuteAsync(null);
+
+        Assert.That(vm.StatusText, Is.EqualTo("This client IP is already in use on the server"));
+        Assert.That(vm.ConnectionState, Is.EqualTo(ConnectionState.Disconnected));
+    }
+
+    [Test]
+    public async Task Connect_InvalidHandshake_ShowsClearError()
+    {
+        var runtime = new RejectingRuntime(HandshakeRejectCode.InvalidHandshake);
+        var vm = new DashboardViewModel(runtime, TestProfile);
+
+        await vm.ConnectCommand.ExecuteAsync(null);
+
+        Assert.That(vm.StatusText, Is.EqualTo("Server rejected our handshake (invalid format)"));
+    }
+
+    [Test]
+    public async Task Connect_ServerShuttingDown_ShowsClearError()
+    {
+        var runtime = new RejectingRuntime(HandshakeRejectCode.ServerShuttingDown);
+        var vm = new DashboardViewModel(runtime, TestProfile);
+
+        await vm.ConnectCommand.ExecuteAsync(null);
+
+        Assert.That(vm.StatusText, Is.EqualTo("Server is shutting down"));
+    }
+
+    [Test]
+    public async Task Connect_UnsupportedPacketFamily_ShowsClearError()
+    {
+        var runtime = new RejectingRuntime(HandshakeRejectCode.UnsupportedPacketFamily);
+        var vm = new DashboardViewModel(runtime, TestProfile);
+
+        await vm.ConnectCommand.ExecuteAsync(null);
+
+        Assert.That(vm.StatusText, Is.EqualTo("Server does not support our packet type"));
+    }
+
+    [Test]
+    public async Task Connect_TransportFailure_ShowsConnectionFailed()
+    {
+        var runtime = new ThrowingRuntime(new InvalidOperationException("Connection refused"));
+        var vm = new DashboardViewModel(runtime, TestProfile);
+
+        await vm.ConnectCommand.ExecuteAsync(null);
+
+        Assert.That(vm.StatusText, Does.Contain("Connection refused"));
+    }
+
+    private sealed class RejectingRuntime : IVpnRuntime
+    {
+        public HandshakeRejectCode RejectCode { get; }
+
+        public RejectingRuntime(HandshakeRejectCode code) => RejectCode = code;
+
+        public ConnectionState State => ConnectionState.Disconnected;
+        public VpnSessionSnapshot CurrentSession => new(ConnectionState.Disconnected, null, 0, 0, 0, 0, 0);
+        public bool IsReconnecting => false;
+
+#pragma warning disable CS0067
+        public event Action<VpnSessionSnapshot>? SessionUpdated;
+        public event Action<VpnLogEntry>? LogEmitted;
+#pragma warning restore CS0067
+
+        public Task ConnectAsync(VpnProfile profile, CancellationToken ct)
+            => throw new HandshakeRejectedException(RejectCode);
+
+        public Task DisconnectAsync() => Task.CompletedTask;
+    }
+
+    private sealed class ThrowingRuntime : IVpnRuntime
+    {
+        private readonly Exception _exception;
+
+        public ThrowingRuntime(Exception exception) => _exception = exception;
+
+        public ConnectionState State => ConnectionState.Disconnected;
+        public VpnSessionSnapshot CurrentSession => new(ConnectionState.Disconnected, null, 0, 0, 0, 0, 0);
+        public bool IsReconnecting => false;
+
+#pragma warning disable CS0067
+        public event Action<VpnSessionSnapshot>? SessionUpdated;
+        public event Action<VpnLogEntry>? LogEmitted;
+#pragma warning restore CS0067
+
+        public Task ConnectAsync(VpnProfile profile, CancellationToken ct)
+            => throw _exception;
+
+        public Task DisconnectAsync() => Task.CompletedTask;
     }
 }
