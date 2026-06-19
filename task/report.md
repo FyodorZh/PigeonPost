@@ -511,5 +511,20 @@ PigeonPost.Vpn.Tests:            Passed: 102 (+1 new)
 - All 6 shell scripts pass `bash -n`
 - `dotnet test` — 293 tests all pass
 
+## Stage 16 — Packaging and Acceptance
 
+### Files Created (4)
+
+| File | Purpose |
+|------|---------|
+| `deploy/desktop/package-macos.sh` | macOS `.app` bundle packaging script |
+| `deploy/android/package-apk.sh` | Android debug APK publishing script |
+| `deploy/desktop/SIGNING.md` | Codesign & notarization instructions |
+| `ACCEPTANCE.md` | V1 acceptance checklist (7 sections) |
+
+### Verification
+- `bash -n deploy/desktop/package-macos.sh` ✓
+- `bash -n deploy/android/package-apk.sh` ✓
+- `dotnet build` — 0 errors
+- `dotnet test` — 293 passed, 8 skipped
 
