@@ -4,7 +4,7 @@
              xmlns:controls="using:PigeonPost.VpnClientView.Controls"
              x:Class="PigeonPost.VpnClientView.Views.DashboardView"
              x:DataType="vm:DashboardViewModel">
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*"
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*"
           ColumnDefinitions="*,*"
           Margin="24">
         <TextBlock Text="Dashboard"
@@ -46,7 +46,23 @@
             </StackPanel>
         </Border>
 
-        <StackPanel Grid.Row="2"
+        <Border Grid.Row="2"
+                Grid.ColumnSpan="2"
+                CornerRadius="8"
+                Padding="12"
+                Margin="0,0,0,12"
+                BorderThickness="1"
+                BorderBrush="#333">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Android VPN Interface"
+                           FontSize="13"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding VpnInterfaceStatusText}"
+                           FontSize="12" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Row="3"
                     Grid.Column="0"
                     Spacing="8"
                     Margin="0,0,8,0">
@@ -78,7 +94,7 @@
             </Grid>
         </StackPanel>
 
-        <StackPanel Grid.Row="2"
+        <StackPanel Grid.Row="3"
                     Grid.Column="1"
                     Spacing="8"
                     Margin="8,0,0,0">
@@ -100,14 +116,14 @@
             </Grid>
         </StackPanel>
 
-        <TextBlock Grid.Row="3"
+        <TextBlock Grid.Row="4"
                    Grid.ColumnSpan="2"
                    Text="Speed (last 30 seconds)"
                    FontSize="13"
                    FontWeight="SemiBold"
                    Margin="0,8,0,4" />
 
-        <Border Grid.Row="4"
+        <Border Grid.Row="5"
                 Grid.ColumnSpan="2"
                 CornerRadius="8"
                 BorderThickness="1"

@@ -9,6 +9,9 @@ public sealed class AndroidVpnBridge : IAndroidServiceBridge
 {
     private readonly WeakReference<Activity> _activityRef;
     private AndroidServiceState _serviceState;
+    private VpnProfile? _profile;
+    private bool _vpnInterfaceEstablished;
+    private AndroidVpnConfiguration? _currentConfiguration;
 
     public const int VpnPermissionRequestCode = 9001;
 
@@ -22,12 +25,17 @@ public sealed class AndroidVpnBridge : IAndroidServiceBridge
         }
     }
 
+    public bool IsVpnInterfaceEstablished => _vpnInterfaceEstablished;
+
+    public AndroidVpnConfiguration? CurrentConfiguration => _currentConfiguration;
+
     public event Action<AndroidServiceState>? ServiceStateChanged;
 
     public AndroidVpnBridge(Activity activity)
     {
         _activityRef = new WeakReference<Activity>(activity);
         PigeonPostVpnService.OnVpnRevoked += OnVpnRevoked;
+        PigeonPostVpnService.OnVpnInterfaceResult += OnVpnInterfaceResult;
     }
 
     public void RequestVpnPermission()
@@ -66,16 +74,46 @@ public sealed class AndroidVpnBridge : IAndroidServiceBridge
 
         PigeonPostVpnService.StartVpn(activity);
         ServiceState = AndroidServiceState.Running;
+
+        if (_profile is not null)
+        {
+            PigeonPostVpnService.RequestEstablishVpnInterface(_profile);
+        }
+    }
+
+    public void StartVpnService(VpnProfile profile)
+    {
+        _profile = profile;
+        StartVpnService();
     }
 
     public void StopVpnService()
     {
         PigeonPostVpnService.StopVpn(global::Android.App.Application.Context);
+        _vpnInterfaceEstablished = false;
+        _currentConfiguration = null;
         ServiceState = AndroidServiceState.Idle;
     }
 
     private void OnVpnRevoked()
     {
+        _vpnInterfaceEstablished = false;
+        _currentConfiguration = null;
         ServiceState = AndroidServiceState.Revoked;
+    }
+
+    private void OnVpnInterfaceResult(bool success)
+    {
+        _vpnInterfaceEstablished = success;
+        if (success && _profile is not null)
+        {
+            _currentConfiguration = AndroidVpnConfiguration.FromProfile(_profile);
+        }
+        else
+        {
+            _currentConfiguration = null;
+        }
+
+        ServiceStateChanged?.Invoke(_serviceState);
     }
 }

@@ -435,4 +435,30 @@ PigeonPost.Vpn.Tests:            Passed: 93 (was 81, +12 new)
 PigeonPost.VpnClientView.Tests:  Passed: 58 (was 52, +6 new)
 ```
 
+## Stage 13 — Android VPN Builder
+
+### Files Created (3)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.Vpn/AndroidVpnConfiguration.cs` | Pure record with `FromProfile(VpnProfile)` factory — client IP, subnet, DNS, route, MTU |
+| `src/PigeonPost.VpnClientView.Android/AndroidVpnBuilder.cs` | Static helper — translates config into `VpnService.Builder` calls |
+| `tests/PigeonPost.Vpn.Tests/AndroidVpnConfigurationTests.cs` | 8 tests: address, prefix, DNS, route, MTU |
+
+### Files Modified (6)
+
+| File | Change |
+|------|--------|
+| `IAndroidServiceBridge.cs` | Added `IsVpnInterfaceEstablished`, `CurrentConfiguration` |
+| `PigeonPostVpnService.cs` | Added `EstablishVpnInterface()`, `CloseVpnInterface()`, static request/result pattern |
+| `AndroidVpnBridge.cs` | Tracks interface state, `StartVpnService(VpnProfile)` overload |
+| `DashboardViewModel.cs` | Added `IsVpnInterfaceEstablished`/`VpnInterfaceStatusText` for Android |
+| `DashboardView.axaml` | Added VPN interface status section |
+| `DashboardViewModelTests.cs` | 3 new tests for VPN interface state transitions |
+
+### Test Results
+```
+PigeonPost.Vpn.Tests:            Passed: 101 (+8 new)
+PigeonPost.VpnClientView.Tests:  Passed: 60 (+3 new)
+```
 

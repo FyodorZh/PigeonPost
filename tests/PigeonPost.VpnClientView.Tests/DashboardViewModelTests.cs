@@ -221,6 +221,8 @@ public sealed class DashboardViewModelTests
     private sealed class TestAndroidBridge : IAndroidServiceBridge
     {
         public AndroidServiceState ServiceState { get; private set; }
+        public bool IsVpnInterfaceEstablished { get; set; }
+        public AndroidVpnConfiguration? CurrentConfiguration { get; set; }
         public event Action<AndroidServiceState>? ServiceStateChanged;
 
         public void RequestVpnPermission()
@@ -250,6 +252,12 @@ public sealed class DashboardViewModelTests
         public void SimulatePermissionGranted()
         {
             ServiceState = AndroidServiceState.Running;
+            ServiceStateChanged?.Invoke(ServiceState);
+        }
+
+        public void SimulateVpnInterfaceEstablished()
+        {
+            IsVpnInterfaceEstablished = true;
             ServiceStateChanged?.Invoke(ServiceState);
         }
     }
@@ -327,9 +335,40 @@ public sealed class DashboardViewModelTests
         _ = vm.ConnectCommand.ExecuteAsync(null);
 
         bridge.SimulatePermissionGranted();
+        bridge.SimulateVpnInterfaceEstablished();
 
         await Task.Delay(2500);
 
         Assert.That(runtime.State, Is.EqualTo(ConnectionState.Connected));
+    }
+
+    [Test]
+    public void AndroidBridge_VpnInterfaceState_UpdatesFromBridge()
+    {
+        var runtime = CreateRuntime();
+        var bridge = new TestAndroidBridge();
+        var vm = new DashboardViewModel(runtime, TestProfile, androidBridge: bridge);
+
+        Assert.That(vm.IsVpnInterfaceEstablished, Is.False);
+        Assert.That(vm.VpnInterfaceStatusText, Is.EqualTo("VPN not configured"));
+
+        bridge.SimulateVpnInterfaceEstablished();
+
+        Assert.That(vm.IsVpnInterfaceEstablished, Is.True);
+        Assert.That(vm.VpnInterfaceStatusText, Is.EqualTo("VPN interface established"));
+    }
+
+    [Test]
+    public void AndroidBridge_VpnInterfaceNotEstablished_ShowsEstablishingMessage()
+    {
+        var runtime = CreateRuntime();
+        var bridge = new TestAndroidBridge();
+        var vm = new DashboardViewModel(runtime, TestProfile, androidBridge: bridge);
+
+        _ = vm.ConnectCommand.ExecuteAsync(null);
+
+        bridge.SimulatePermissionGranted();
+
+        Assert.That(vm.StatusText, Is.EqualTo("Establishing VPN interface..."));
     }
 }

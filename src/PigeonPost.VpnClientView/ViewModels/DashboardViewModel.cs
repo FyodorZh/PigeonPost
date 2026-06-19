@@ -56,6 +56,12 @@ public sealed partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private IReadOnlyList<double> _receivedHistory = Array.Empty<double>();
 
+    [ObservableProperty]
+    private bool _isVpnInterfaceEstablished;
+
+    [ObservableProperty]
+    private string _vpnInterfaceStatusText = "VPN not configured";
+
     public string StatusBadgeColor => ConnectionState switch
     {
         ConnectionState.Connected => "#4CAF50",
@@ -76,6 +82,12 @@ public sealed partial class DashboardViewModel : ObservableObject
 
         _runtime.SessionUpdated += OnSessionUpdated;
         UpdateFromSnapshot(runtime.CurrentSession);
+
+        if (_androidBridge is { } bridge)
+        {
+            IsVpnInterfaceEstablished = bridge.IsVpnInterfaceEstablished;
+            UpdateVpnInterfaceStatus();
+        }
     }
 
     partial void OnConnectionStateChanged(ConnectionState value)
@@ -196,6 +208,9 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     private void OnAndroidServiceStateChanged(AndroidServiceState state)
     {
+        IsVpnInterfaceEstablished = _androidBridge?.IsVpnInterfaceEstablished ?? false;
+        UpdateVpnInterfaceStatus();
+
         if (state == AndroidServiceState.Revoked)
         {
             _ = _runtime.DisconnectAsync();
@@ -203,9 +218,23 @@ public sealed partial class DashboardViewModel : ObservableObject
         }
         else if (state == AndroidServiceState.Running && _pendingAndroidConnect)
         {
-            _pendingAndroidConnect = false;
-            _ = ConnectRuntimeAsync();
+            if (IsVpnInterfaceEstablished)
+            {
+                _pendingAndroidConnect = false;
+                _ = ConnectRuntimeAsync();
+            }
+            else
+            {
+                StatusText = "Establishing VPN interface...";
+            }
         }
+    }
+
+    private void UpdateVpnInterfaceStatus()
+    {
+        VpnInterfaceStatusText = IsVpnInterfaceEstablished
+            ? "VPN interface established"
+            : "VPN not configured";
     }
 
     private static string FormatBytes(long bytes)

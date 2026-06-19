@@ -114,6 +114,8 @@ public sealed class AndroidServiceStateTests
 internal sealed class TestAndroidServiceBridge : IAndroidServiceBridge
 {
     public AndroidServiceState ServiceState { get; private set; }
+    public bool IsVpnInterfaceEstablished { get; set; }
+    public AndroidVpnConfiguration? CurrentConfiguration { get; set; }
     public event Action<AndroidServiceState>? ServiceStateChanged;
 
     public void RequestVpnPermission()
@@ -135,6 +137,12 @@ internal sealed class TestAndroidServiceBridge : IAndroidServiceBridge
     public void SimulateRevoke()
     {
         ServiceState = AndroidServiceState.Revoked;
+        ServiceStateChanged?.Invoke(ServiceState);
+    }
+
+    public void SimulateVpnInterfaceEstablished()
+    {
+        IsVpnInterfaceEstablished = true;
         ServiceStateChanged?.Invoke(ServiceState);
     }
 }

@@ -2,6 +2,8 @@ using System;
 using Android.App;
 using Android.Content;
 using Android.Net;
+using Android.OS;
+using PigeonPost.Vpn;
 
 namespace PigeonPost.VpnClientView.Android;
 
@@ -12,19 +14,36 @@ public class PigeonPostVpnService : VpnService
     private const string NotificationChannelId = "pigeonpost_vpn";
     private const int NotificationId = 1001;
 
+    private ParcelFileDescriptor? _vpnInterface;
+    private static VpnProfile? _pendingProfile;
+
+    public static PigeonPostVpnService? Current { get; private set; }
     public static Action? OnVpnRevoked;
+    public static Action<bool>? OnVpnInterfaceResult;
+
+    public bool IsVpnInterfaceEstablished => _vpnInterface is not null;
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
     {
+        Current = this;
         CreateNotificationChannel();
         var notification = BuildNotification();
         StartForeground(NotificationId, notification);
+
+        if (_pendingProfile is { } profile)
+        {
+            _pendingProfile = null;
+            var success = EstablishVpnInterface(profile);
+            OnVpnInterfaceResult?.Invoke(success);
+        }
+
         return StartCommandResult.Sticky;
     }
 
     public override void OnRevoke()
     {
         base.OnRevoke();
+        CloseVpnInterface();
         OnVpnRevoked?.Invoke();
         StopForeground(true);
         StopSelf();
@@ -32,8 +51,51 @@ public class PigeonPostVpnService : VpnService
 
     public override void OnDestroy()
     {
+        CloseVpnInterface();
+        Current = null;
         StopForeground(true);
         base.OnDestroy();
+    }
+
+    public bool EstablishVpnInterface(VpnProfile profile)
+    {
+        if (_vpnInterface is not null)
+            return true;
+
+        try
+        {
+            var config = AndroidVpnConfiguration.FromProfile(profile);
+            var builder = AndroidVpnBuilder.Configure(this, config);
+            _vpnInterface = builder.Establish();
+            return _vpnInterface is not null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public void CloseVpnInterface()
+    {
+        if (_vpnInterface is not null)
+        {
+            try { _vpnInterface.Close(); } catch { }
+            try { _vpnInterface.Dispose(); } catch { }
+            _vpnInterface = null;
+        }
+    }
+
+    public static void RequestEstablishVpnInterface(VpnProfile profile)
+    {
+        if (Current is { } service)
+        {
+            var success = service.EstablishVpnInterface(profile);
+            OnVpnInterfaceResult?.Invoke(success);
+        }
+        else
+        {
+            _pendingProfile = profile;
+        }
     }
 
     private void CreateNotificationChannel()
