@@ -1,6 +1,9 @@
+using System;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using PigeonPost.Vpn;
 using PigeonPost.VpnClientView.ViewModels;
@@ -9,6 +12,9 @@ namespace PigeonPost.VpnClientView;
 
 public partial class App : Application
 {
+    private ServiceProvider? _services;
+    private IVpnRuntime? _runtime;
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -28,16 +34,50 @@ public partial class App : Application
             services.AddSingleton<LogsViewModel>();
             services.AddSingleton<AboutViewModel>();
             services.AddSingleton<MainViewModel>();
-            var provider = services.BuildServiceProvider();
+            _services = services.BuildServiceProvider();
 
-            var vm = provider.GetRequiredService<MainViewModel>();
+            _runtime = _services.GetRequiredService<IVpnRuntime>();
+
+            var vm = _services.GetRequiredService<MainViewModel>();
 
             desktop.MainWindow = new Views.MainWindow
             {
                 DataContext = vm
             };
+
+            desktop.MainWindow.Closing += OnMainWindowClosing;
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        var rt = _runtime;
+        if (rt == null)
+            return;
+
+        _runtime = null;
+
+        if (rt.State == ConnectionState.Disconnected)
+        {
+            if (rt is IDisposable d)
+                d.Dispose();
+            return;
+        }
+
+        e.Cancel = true;
+
+        rt.DisconnectAsync().ContinueWith(_ =>
+        {
+            if (rt is IDisposable d)
+                d.Dispose();
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                    desktop.MainWindow?.Close();
+            });
+        });
     }
 }

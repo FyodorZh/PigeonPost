@@ -32,7 +32,8 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
     private bool _disposed;
     private bool _connecting;
 
-    private NullTunDevice? _nullTun;
+    private ProbeTunDevice? _probeTun;
+    private ProbeScheduler? _probeScheduler;
     private CountingTunDevice? _countingTun;
     private PacketBuffer? _buffer;
     private BridgeImpl? _bridge;
@@ -40,6 +41,10 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
     private ITransport? _transport;
     private TaskCompletionSource? _transportStoppedTcs;
     private CancellationTokenSource? _connectCts;
+    private Timer? _statsTimer;
+    private long _prevBytesSent;
+    private long _prevBytesReceived;
+    private DateTime _prevStatsTime;
 
     public ConnectionState State
     {
@@ -108,8 +113,8 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
                 LogEmitted?.Invoke(entry);
             });
 
-            _nullTun = new NullTunDevice();
-            _countingTun = new CountingTunDevice(_nullTun);
+            _probeTun = new ProbeTunDevice();
+            _countingTun = new CountingTunDevice(_probeTun);
             _buffer = new PacketBuffer(10 * 1024 * 1024);
             _bridge = new BridgeImpl(_countingTun, _buffer, _runtimeLogger, _verbose);
 
@@ -123,6 +128,11 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
             using var reg = _connectCts.Token.Register(() => connectTcs.TrySetCanceled());
 
             await connectTcs.Task;
+
+            var clientIp = IPv4.Parse(_profile.FullClientIp);
+            _probeScheduler = new ProbeScheduler(_probeTun!, _runtimeLogger!, clientIp.Value);
+            _probeScheduler.Start();
+            EmitLog("Probe scheduler started", VpnLogLevel.Info);
 
             lock (_lock)
             {
@@ -187,6 +197,7 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
             }
             EmitLog("Connected", VpnLogLevel.Info);
             SessionUpdated?.Invoke(CreateSnapshot());
+            StartStatsTimer();
             connectTcs.TrySetResult();
         };
 
@@ -246,6 +257,9 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
         }
 
         _connectCts?.Cancel();
+        _probeScheduler?.Dispose();
+        _probeScheduler = null;
+        StopStatsTimer();
         CleanupAll();
 
         lock (_lock)
@@ -254,6 +268,8 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
             _connecting = false;
             _isReconnecting = false;
             _sessionStart = null;
+            _speedSentBps = 0;
+            _speedReceivedBps = 0;
         }
 
         EmitLog("Disconnected", VpnLogLevel.Info);
@@ -271,9 +287,14 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
         _shutdownRequested = true;
         _connectCts?.Cancel();
         _connectCts?.Dispose();
+        _probeScheduler?.Dispose();
+        _probeScheduler = null;
+        StopStatsTimer();
         CleanupAll();
         _bridge?.Dispose();
         _runtimeLogger?.Dispose();
+        _probeTun?.Dispose();
+        _probeTun = null;
     }
 
     private async Task ReconnectLoopAsync()
@@ -285,11 +306,15 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
             if (_shutdownRequested)
                 break;
 
+            StopStatsTimer();
+
             lock (_lock)
             {
                 _isReconnecting = true;
                 _state = ConnectionState.Disconnected;
                 _sessionStart = null;
+                _speedSentBps = 0;
+                _speedReceivedBps = 0;
             }
 
             EmitLog("Connection lost. Reconnecting in 1 second...", VpnLogLevel.Warning);
@@ -334,6 +359,7 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
                 }
                 EmitLog("Reconnected", VpnLogLevel.Info);
                 SessionUpdated?.Invoke(CreateSnapshot());
+                StartStatsTimer();
                 connectTcs.TrySetResult();
             };
 
@@ -393,5 +419,52 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
     internal void TestConnectTcsForReconnect()
     {
         _transportStoppedTcs?.TrySetResult();
+    }
+
+    private void StartStatsTimer()
+    {
+        StopStatsTimer();
+        _prevBytesSent = _countingTun?.BytesSent ?? 0;
+        _prevBytesReceived = _countingTun?.BytesReceived ?? 0;
+        _prevStatsTime = DateTime.UtcNow;
+        _speedSentBps = 0;
+        _speedReceivedBps = 0;
+        _statsTimer = new Timer(StatsTimerCallback, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void StopStatsTimer()
+    {
+        _statsTimer?.Dispose();
+        _statsTimer = null;
+    }
+
+    private void StatsTimerCallback(object? state)
+    {
+        VpnSessionSnapshot snapshot;
+
+        lock (_lock)
+        {
+            if (_state != ConnectionState.Connected || _countingTun == null)
+                return;
+
+            var now = DateTime.UtcNow;
+            var currentSent = _countingTun.BytesSent;
+            var currentReceived = _countingTun.BytesReceived;
+
+            var elapsed = (now - _prevStatsTime).TotalSeconds;
+            if (elapsed >= 0.5)
+            {
+                _speedSentBps = (currentSent - _prevBytesSent) * 8.0 / elapsed;
+                _speedReceivedBps = (currentReceived - _prevBytesReceived) * 8.0 / elapsed;
+
+                _prevBytesSent = currentSent;
+                _prevBytesReceived = currentReceived;
+                _prevStatsTime = now;
+            }
+
+            snapshot = CreateSnapshot();
+        }
+
+        SessionUpdated?.Invoke(snapshot);
     }
 }

@@ -298,3 +298,26 @@ Correct JDK 17 location for Android builds:
 /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 ```
 
+## Stage 09 — Desktop macOS Probe Mode
+
+### Files Created (4)
+
+| File | Description |
+|------|-------------|
+| `src/PigeonPost.Vpn/IcmpHelper.cs` | Static helper: `CreateEchoRequest`, `TryParseEchoReply`, `ComputeChecksum` |
+| `src/PigeonPost.Vpn/ProbeTunDevice.cs` | `ITunDevice` with queue-backed probe packets, reply matching, timeout checking |
+| `src/PigeonPost.Vpn/ProbeScheduler.cs` | Timer-driven (3s interval), logs replies/timeouts |
+| `tests/PigeonPost.Vpn.Tests/IcmpHelperTests.cs` | 10 tests: valid packet, round-trip, wrong protocol/type, checksum |
+| `tests/PigeonPost.Vpn.Tests/ProbeTunDeviceTests.cs` | 16 tests: read queue, reply detection, non-ICMP ignored, clear, timeouts, events |
+
+### Files Modified (1)
+
+| File | Change |
+|------|--------|
+| `VpnClientRuntime.cs` | Replaced `NullTunDevice` with `ProbeTunDevice` + `CountingTunDevice` chain; starts `ProbeScheduler` on connect |
+
+### Test Results
+```
+PigeonPost.Vpn.Tests:            Passed: 79 (was 53, +26 new)
+```
+
