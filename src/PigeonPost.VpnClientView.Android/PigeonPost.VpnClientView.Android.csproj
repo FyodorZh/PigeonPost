@@ -14,4 +14,10 @@
   <ItemGroup>
     <ProjectReference Include="..\PigeonPost.VpnClientView\PigeonPost.VpnClientView.csproj" />
   </ItemGroup>
+  <Target Name="ReplaceUnsignedApkWithSigned" AfterTargets="_Sign">
+    <Copy SourceFiles="$(OutputPath)$(ApplicationId)-Signed.apk"
+          DestinationFiles="$(OutputPath)$(ApplicationId).apk"
+          Condition="Exists('$(OutputPath)$(ApplicationId)-Signed.apk')"
+          OverwriteReadOnlyFiles="true" />
+  </Target>
 </Project>
