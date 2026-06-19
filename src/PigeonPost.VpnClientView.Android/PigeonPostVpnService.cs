@@ -21,6 +21,9 @@ public class PigeonPostVpnService : VpnService
     public static Action? OnVpnRevoked;
     public static Action<bool>? OnVpnInterfaceResult;
 
+    public AndroidTunDevice? TunDevice { get; private set; }
+    public AndroidSocketProtector? SocketProtector { get; private set; }
+
     public bool IsVpnInterfaceEstablished => _vpnInterface is not null;
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
@@ -67,6 +70,11 @@ public class PigeonPostVpnService : VpnService
             var config = AndroidVpnConfiguration.FromProfile(profile);
             var builder = AndroidVpnBuilder.Configure(this, config);
             _vpnInterface = builder.Establish();
+            if (_vpnInterface is not null)
+            {
+                TunDevice = new AndroidTunDevice(_vpnInterface);
+                SocketProtector = new AndroidSocketProtector(this);
+            }
             return _vpnInterface is not null;
         }
         catch
@@ -77,6 +85,14 @@ public class PigeonPostVpnService : VpnService
 
     public void CloseVpnInterface()
     {
+        if (TunDevice is not null)
+        {
+            try { TunDevice.Close(); } catch { }
+            TunDevice = null;
+        }
+
+        SocketProtector = null;
+
         if (_vpnInterface is not null)
         {
             try { _vpnInterface.Close(); } catch { }

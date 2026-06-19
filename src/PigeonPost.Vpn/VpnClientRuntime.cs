@@ -37,13 +37,14 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
     private ProbeTunDevice? _probeTun;
     private ProbeScheduler? _probeScheduler;
     private CountingTunDevice? _countingTun;
+    private ITunDevice? _customTunDevice;
     private PacketBuffer? _buffer;
     private BridgeImpl? _bridge;
     private RuntimeLogger? _runtimeLogger;
     private ITransport? _transport;
     private TaskCompletionSource? _transportStoppedTcs;
     private CancellationTokenSource? _connectCts;
-    private readonly ISocketProtector? _socketProtector;
+    private ISocketProtector? _socketProtector;
     private Timer? _statsTimer;
     private long _prevBytesSent;
     private long _prevBytesReceived;
@@ -71,6 +72,16 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
     {
         _verbose = verbose;
         _socketProtector = socketProtector;
+    }
+
+    public void SetCustomTunDevice(ITunDevice? device)
+    {
+        _customTunDevice = device;
+    }
+
+    public void SetSocketProtector(ISocketProtector? protector)
+    {
+        _socketProtector = protector;
     }
 
     private void ProtectEndpointSocket(Pontifex.Abstractions.Endpoints.IAckRawBaseEndpoint endpoint)
@@ -139,8 +150,19 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
                 LogEmitted?.Invoke(entry);
             });
 
-            _probeTun = new ProbeTunDevice();
-            _countingTun = new CountingTunDevice(_probeTun);
+            ITunDevice baseDevice;
+            if (_customTunDevice is { } custom)
+            {
+                baseDevice = custom;
+                EmitLog("Using custom TUN device", VpnLogLevel.Info);
+            }
+            else
+            {
+                _probeTun = new ProbeTunDevice();
+                baseDevice = _probeTun;
+            }
+
+            _countingTun = new CountingTunDevice(baseDevice);
             _buffer = new PacketBuffer(10 * 1024 * 1024);
             _bridge = new BridgeImpl(_countingTun, _buffer, _runtimeLogger, _verbose);
 
@@ -155,10 +177,13 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
 
             await connectTcs.Task;
 
-            var clientIp = IPv4.Parse(_profile.FullClientIp);
-            _probeScheduler = new ProbeScheduler(_probeTun!, _runtimeLogger!, clientIp.Value);
-            _probeScheduler.Start();
-            EmitLog("Probe scheduler started", VpnLogLevel.Info);
+            if (_customTunDevice is null)
+            {
+                var clientIp = IPv4.Parse(_profile.FullClientIp);
+                _probeScheduler = new ProbeScheduler(_probeTun!, _runtimeLogger!, clientIp.Value);
+                _probeScheduler.Start();
+                EmitLog("Probe scheduler started", VpnLogLevel.Info);
+            }
 
             lock (_lock)
             {
@@ -287,6 +312,7 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
         _connectCts?.Cancel();
         _probeScheduler?.Dispose();
         _probeScheduler = null;
+        _customTunDevice = null;
         StopStatsTimer();
         CleanupAll();
 
@@ -317,6 +343,7 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
         _connectCts?.Dispose();
         _probeScheduler?.Dispose();
         _probeScheduler = null;
+        _customTunDevice = null;
         StopStatsTimer();
         CleanupAll();
         _bridge?.Dispose();

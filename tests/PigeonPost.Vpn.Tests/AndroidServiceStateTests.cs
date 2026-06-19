@@ -140,6 +140,10 @@ internal sealed class TestAndroidServiceBridge : IAndroidServiceBridge
         ServiceStateChanged?.Invoke(ServiceState);
     }
 
+    public void SetRuntime(IVpnRuntime runtime)
+    {
+    }
+
     public void SimulateVpnInterfaceEstablished()
     {
         IsVpnInterfaceEstablished = true;

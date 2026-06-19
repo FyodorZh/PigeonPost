@@ -462,3 +462,29 @@ PigeonPost.Vpn.Tests:            Passed: 101 (+8 new)
 PigeonPost.VpnClientView.Tests:  Passed: 60 (+3 new)
 ```
 
+## Stage 14 — Android Real Tunnel
+
+### Files Created (2)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.VpnClientView.Android/AndroidTunDevice.cs` | `ITunDevice` over `ParcelFileDescriptor` using `FileInputStream`/`FileOutputStream` |
+| `src/PigeonPost.VpnClientView.Android/AndroidSocketProtector.cs` | `ISocketProtector` calling `VpnService.Protect(int)` |
+
+### Files Modified (6)
+
+| File | Change |
+|------|--------|
+| `VpnClientRuntime.cs` | Added `SetCustomTunDevice(ITunDevice?)`, `SetSocketProtector(ISocketProtector?)` — custom TUN replaces ProbeTunDevice, skips probe scheduler |
+| `IAndroidServiceBridge.cs` | Added `SetRuntime(IVpnRuntime)` method |
+| `PigeonPostVpnService.cs` | Creates `AndroidTunDevice` + `AndroidSocketProtector` after `EstablishVpnInterface()`, exposes via properties |
+| `AndroidVpnBridge.cs` | Implements `SetRuntime()`, wires AndroidTUN + protector into runtime |
+| `DashboardViewModel.cs` | Calls `bridge.SetRuntime(runtime)` |
+| `VpnClientRuntimeTests.cs` | Added custom TUN device test + `RecordingTunDevice` helper |
+
+### Test Results
+```
+PigeonPost.Vpn.Tests:            Passed: 102 (+1 new)
+```
+
+

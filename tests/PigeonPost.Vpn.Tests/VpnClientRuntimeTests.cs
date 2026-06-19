@@ -7,6 +7,7 @@ using Pontifex.Abstractions;
 using Pontifex.Abstractions.Servers;
 using Pontifex.Transports.Direct;
 using PigeonPost.Bridge;
+using PigeonPost.Tun;
 using Scriba;
 using Scriba.Consumers;
 
@@ -160,6 +161,64 @@ public sealed class VpnClientRuntimeTests
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
             await runtime.ConnectAsync(badProfile, cts.Token);
         });
+    }
+
+    [Test]
+    public async Task SetCustomTunDevice_BeforeConnect_UsesCustomDevice()
+    {
+        string ep = NextEndpoint();
+        var profile = new VpnProfile($"direct|{ep}", 15);
+        var server = CreateAndStartServer(ep);
+
+        try
+        {
+            using var runtime = new VpnClientRuntime();
+            var customTun = new RecordingTunDevice();
+            runtime.SetCustomTunDevice(customTun);
+
+            await runtime.ConnectAsync(profile, CancellationToken.None);
+
+            var snapshot = runtime.CurrentSession;
+            Assert.That(snapshot.State, Is.EqualTo(ConnectionState.Connected));
+            Assert.That(snapshot.BytesSent, Is.GreaterThanOrEqualTo(0));
+            Assert.That(snapshot.BytesReceived, Is.GreaterThanOrEqualTo(0));
+        }
+        finally
+        {
+            server.Stop();
+        }
+    }
+
+    private sealed class RecordingTunDevice : ITunDevice
+    {
+        private volatile bool _closed;
+
+        public string Name => "recording";
+        public bool IsOpen => !_closed;
+        public int ReadCount { get; internal set; }
+
+        public int Read(byte[] buffer)
+        {
+            if (_closed)
+                return 0;
+
+            ReadCount++;
+            return 0;
+        }
+
+        public void Write(byte[] buffer)
+        {
+        }
+
+        public void Close()
+        {
+            _closed = true;
+        }
+
+        public void Dispose()
+        {
+            _closed = true;
+        }
     }
 
     private string NextEndpoint()

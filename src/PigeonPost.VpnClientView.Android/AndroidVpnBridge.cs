@@ -12,6 +12,7 @@ public sealed class AndroidVpnBridge : IAndroidServiceBridge
     private VpnProfile? _profile;
     private bool _vpnInterfaceEstablished;
     private AndroidVpnConfiguration? _currentConfiguration;
+    private IVpnRuntime? _runtime;
 
     public const int VpnPermissionRequestCode = 9001;
 
@@ -87,6 +88,11 @@ public sealed class AndroidVpnBridge : IAndroidServiceBridge
         StartVpnService();
     }
 
+    public void SetRuntime(IVpnRuntime runtime)
+    {
+        _runtime = runtime;
+    }
+
     public void StopVpnService()
     {
         PigeonPostVpnService.StopVpn(global::Android.App.Application.Context);
@@ -108,6 +114,15 @@ public sealed class AndroidVpnBridge : IAndroidServiceBridge
         if (success && _profile is not null)
         {
             _currentConfiguration = AndroidVpnConfiguration.FromProfile(_profile);
+
+            if (_runtime is VpnClientRuntime clientRuntime)
+            {
+                var service = PigeonPostVpnService.Current;
+                if (service?.TunDevice is { } tun)
+                    clientRuntime.SetCustomTunDevice(tun);
+                if (service?.SocketProtector is { } p)
+                    clientRuntime.SetSocketProtector(p);
+            }
         }
         else
         {

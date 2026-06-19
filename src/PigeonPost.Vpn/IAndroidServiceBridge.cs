@@ -11,4 +11,5 @@ public interface IAndroidServiceBridge
     void RequestVpnPermission();
     void StartVpnService();
     void StopVpnService();
+    void SetRuntime(IVpnRuntime runtime);
 }

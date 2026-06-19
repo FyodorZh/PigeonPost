@@ -77,15 +77,18 @@ public sealed partial class DashboardViewModel : ObservableObject
         _store = store;
         _androidBridge = androidBridge ?? AndroidServiceBridgeLocator.Bridge;
 
-        if (androidBridge is not null)
-            androidBridge.ServiceStateChanged += OnAndroidServiceStateChanged;
+        if (_androidBridge is { } bridge)
+        {
+            bridge.SetRuntime(runtime);
+            bridge.ServiceStateChanged += OnAndroidServiceStateChanged;
+        }
 
         _runtime.SessionUpdated += OnSessionUpdated;
         UpdateFromSnapshot(runtime.CurrentSession);
 
-        if (_androidBridge is { } bridge)
+        if (_androidBridge is { } br)
         {
-            IsVpnInterfaceEstablished = bridge.IsVpnInterfaceEstablished;
+            IsVpnInterfaceEstablished = br.IsVpnInterfaceEstablished;
             UpdateVpnInterfaceStatus();
         }
     }

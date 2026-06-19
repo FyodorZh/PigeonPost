@@ -255,6 +255,10 @@ public sealed class DashboardViewModelTests
             ServiceStateChanged?.Invoke(ServiceState);
         }
 
+        public void SetRuntime(IVpnRuntime runtime)
+        {
+        }
+
         public void SimulateVpnInterfaceEstablished()
         {
             IsVpnInterfaceEstablished = true;
