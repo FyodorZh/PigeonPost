@@ -217,4 +217,119 @@ public sealed class DashboardViewModelTests
 
         public Task DisconnectAsync() => Task.CompletedTask;
     }
+
+    private sealed class TestAndroidBridge : IAndroidServiceBridge
+    {
+        public AndroidServiceState ServiceState { get; private set; }
+        public event Action<AndroidServiceState>? ServiceStateChanged;
+
+        public void RequestVpnPermission()
+        {
+            ServiceState = AndroidServiceState.Preparing;
+            ServiceStateChanged?.Invoke(ServiceState);
+        }
+
+        public void StartVpnService()
+        {
+            ServiceState = AndroidServiceState.Running;
+            ServiceStateChanged?.Invoke(ServiceState);
+        }
+
+        public void StopVpnService()
+        {
+            ServiceState = AndroidServiceState.Idle;
+            ServiceStateChanged?.Invoke(ServiceState);
+        }
+
+        public void SimulateRevoke()
+        {
+            ServiceState = AndroidServiceState.Revoked;
+            ServiceStateChanged?.Invoke(ServiceState);
+        }
+
+        public void SimulatePermissionGranted()
+        {
+            ServiceState = AndroidServiceState.Running;
+            ServiceStateChanged?.Invoke(ServiceState);
+        }
+    }
+
+    [Test]
+    public void AndroidBridge_IsStored()
+    {
+        var bridge = new TestAndroidBridge();
+        var vm = new DashboardViewModel(CreateRuntime(), TestProfile, androidBridge: bridge);
+        Assert.That(vm, Is.Not.Null);
+    }
+
+    [Test]
+    public void AndroidBridge_IdleState_RequestsPermissionOnConnect()
+    {
+        var bridge = new TestAndroidBridge();
+        var vm = new DashboardViewModel(CreateRuntime(), TestProfile, androidBridge: bridge);
+
+        _ = vm.ConnectCommand.ExecuteAsync(null);
+
+        Assert.That(bridge.ServiceState, Is.EqualTo(AndroidServiceState.Preparing));
+    }
+
+    [Test]
+    public async Task AndroidBridge_ConnectTriggersRuntimeConnectWhenServiceRunning()
+    {
+        var runtime = CreateRuntime();
+        var bridge = new TestAndroidBridge();
+        bridge.StartVpnService();
+
+        var vm = new DashboardViewModel(runtime, TestProfile, androidBridge: bridge);
+
+        await vm.ConnectCommand.ExecuteAsync(null);
+
+        Assert.That(runtime.State, Is.EqualTo(ConnectionState.Connected));
+    }
+
+    [Test]
+    public void AndroidBridge_RevokeDisconnectsRuntime()
+    {
+        var runtime = CreateRuntime();
+        var bridge = new TestAndroidBridge();
+        var vm = new DashboardViewModel(runtime, TestProfile, androidBridge: bridge);
+
+        runtime.ConnectAsync(TestProfile, CancellationToken.None).Wait();
+        Assert.That(runtime.State, Is.EqualTo(ConnectionState.Connected));
+
+        bridge.SimulateRevoke();
+
+        Assert.That(runtime.State, Is.EqualTo(ConnectionState.Disconnected));
+    }
+
+    [Test]
+    public void AndroidBridge_DisconnectStopsService()
+    {
+        var runtime = CreateRuntime();
+        var bridge = new TestAndroidBridge();
+        var vm = new DashboardViewModel(runtime, TestProfile, androidBridge: bridge);
+
+        bridge.StartVpnService();
+        runtime.ConnectAsync(TestProfile, CancellationToken.None).Wait();
+
+        _ = vm.DisconnectCommand.ExecuteAsync(null);
+
+        Assert.That(bridge.ServiceState, Is.EqualTo(AndroidServiceState.Idle));
+    }
+
+    [Test]
+    public async Task AndroidBridge_ServiceRunningEvent_TriggersRuntimeConnect()
+    {
+        var runtime = CreateRuntime();
+        var bridge = new TestAndroidBridge();
+        var vm = new DashboardViewModel(runtime, TestProfile, androidBridge: bridge);
+
+        _ = vm.ConnectCommand.ExecuteAsync(null);
+
+        bridge.SimulatePermissionGranted();
+
+        await Task.Delay(2500);
+
+        Assert.That(runtime.State, Is.EqualTo(ConnectionState.Connected));
+    }
 }

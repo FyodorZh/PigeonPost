@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PigeonPost.VpnClientView.ViewModels"
+             xmlns:views="using:PigeonPost.VpnClientView.Views"
+             x:Class="PigeonPost.VpnClientView.Views.MainView"
+             x:DataType="vm:MainViewModel">
+    <Grid>
+        <DockPanel IsVisible="{Binding IsWideLayout}"
+                   LastChildFill="True">
+            <Border DockPanel.Dock="Left"
+                    Width="200"
+                    Background="#1A1A2E">
+                <StackPanel Spacing="4"
+                            Margin="12">
+                    <TextBlock Text="PigeonPost"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#4CAF50"
+                               Margin="0,0,0,16" />
+                    <ListBox SelectedIndex="{Binding SelectedTabIndex}"
+                             Background="Transparent"
+                             BorderThickness="0">
+                        <ListBoxItem Content="Dashboard"
+                                     Padding="12,8"
+                                     AutomationProperties.Name="Dashboard" />
+                        <ListBoxItem Content="Config"
+                                     Padding="12,8"
+                                     AutomationProperties.Name="Config" />
+                        <ListBoxItem Content="Logs"
+                                     Padding="12,8"
+                                     AutomationProperties.Name="Logs" />
+                        <ListBoxItem Content="About"
+                                     Padding="12,8"
+                                     AutomationProperties.Name="About" />
+                    </ListBox>
+                </StackPanel>
+            </Border>
+            <Grid>
+                <Panel IsVisible="{Binding IsDashboardTab}">
+                    <views:DashboardView DataContext="{Binding DashboardViewModel}" />
+                </Panel>
+                <Panel IsVisible="{Binding IsConfigTab}">
+                    <views:ConfigView DataContext="{Binding ConfigViewModel}" />
+                </Panel>
+                <Panel IsVisible="{Binding IsLogsTab}">
+                    <views:LogsView DataContext="{Binding LogsViewModel}" />
+                </Panel>
+                <Panel IsVisible="{Binding IsAboutTab}">
+                    <views:AboutView DataContext="{Binding AboutViewModel}" />
+                </Panel>
+            </Grid>
+        </DockPanel>
+
+        <TabControl IsVisible="{Binding IsNarrowLayout}"
+                    SelectedIndex="{Binding SelectedTabIndex}">
+            <TabItem Header="Dashboard"
+                     AutomationProperties.Name="Dashboard tab">
+                <views:DashboardView DataContext="{Binding DashboardViewModel}" />
+            </TabItem>
+            <TabItem Header="Config"
+                     AutomationProperties.Name="Config tab">
+                <views:ConfigView DataContext="{Binding ConfigViewModel}" />
+            </TabItem>
+            <TabItem Header="Logs"
+                     AutomationProperties.Name="Logs tab">
+                <views:LogsView DataContext="{Binding LogsViewModel}" />
+            </TabItem>
+            <TabItem Header="About"
+                     AutomationProperties.Name="About tab">
+                <views:AboutView DataContext="{Binding AboutViewModel}" />
+            </TabItem>
+        </TabControl>
+    </Grid>
+</UserControl>

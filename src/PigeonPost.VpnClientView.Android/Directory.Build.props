@@ -1,5 +1,7 @@
 <Project>
   <PropertyGroup>
     <JavaSdkDirectory>/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home</JavaSdkDirectory>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);CA1416;CA1422</NoWarn>
   </PropertyGroup>
 </Project>

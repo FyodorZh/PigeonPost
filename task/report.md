@@ -401,3 +401,38 @@ After Pontifex handshake completes (`EndpointConnected` event), `ProtectEndpoint
 PigeonPost.Vpn.Tests:            Passed: 81 (was 79, +2 new)
 ```
 
+## Stage 12 — Android Host Service
+
+### Files Created (6)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.Vpn/AndroidServiceState.cs` | Enum: `Idle`, `Preparing`, `Running`, `Revoked` |
+| `src/PigeonPost.Vpn/IAndroidServiceBridge.cs` | Interface for service lifecycle communication |
+| `src/PigeonPost.Vpn/AndroidServiceBridgeLocator.cs` | Static locator for cross-project bridge access |
+| `src/PigeonPost.VpnClientView.Android/PigeonPostVpnService.cs` | `VpnService` subclass — foreground service, notification, `OnRevoke()` |
+| `src/PigeonPost.VpnClientView.Android/AndroidVpnBridge.cs` | `IAndroidServiceBridge` impl — permission flow, start/stop/revoke |
+| `tests/PigeonPost.Vpn.Tests/AndroidServiceStateTests.cs` | 12 tests: enum, bridge state transitions, events |
+
+### Files Modified (4)
+
+| File | Change |
+|------|--------|
+| `MainActivity.cs` | Creates `AndroidVpnBridge`, handles `OnActivityResult` for permission |
+| `AndroidManifest.xml` | Added `FOREGROUND_SERVICE_CONNECTED_DEVICE` + `<service>` element |
+| `Directory.Build.props` (Android) | Added `<Nullable>enable</Nullable>` + `<NoWarn>` |
+| `DashboardViewModel.cs` | Added optional bridge param + locator; Android-aware connect/disconnect flows |
+
+### Architecture
+- **Static locator** avoids coupling shared UI to Android; Desktop leaves locator null.
+- **Connect flow**: User taps Connect → bridge checks permission → `VpnService.Prepare()` → system dialog → on grant → start service → connect runtime.
+- **Revoke flow**: `OnRevoke()` → state `Revoked` → force disconnect + status text.
+- **Disconnect flow**: Disconnect runtime → stop service.
+
+### Test Results
+```
+PigeonPost.Vpn.Tests:            Passed: 93 (was 81, +12 new)
+PigeonPost.VpnClientView.Tests:  Passed: 58 (was 52, +6 new)
+```
+
+

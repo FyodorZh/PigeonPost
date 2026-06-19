@@ -16,7 +16,9 @@ public sealed partial class DashboardViewModel : ObservableObject
     private readonly IVpnRuntime _runtime;
     private readonly IProfileStore? _store;
     private readonly VpnProfile? _profile;
+    private readonly IAndroidServiceBridge? _androidBridge;
     private readonly SpeedHistoryBuffer _speedHistory = new();
+    private bool _pendingAndroidConnect;
 
     [ObservableProperty]
     private ConnectionState _connectionState = ConnectionState.Disconnected;
@@ -61,11 +63,16 @@ public sealed partial class DashboardViewModel : ObservableObject
         _ => "#9E9E9E"
     };
 
-    public DashboardViewModel(IVpnRuntime runtime, VpnProfile? profile = null, IProfileStore? store = null)
+    public DashboardViewModel(IVpnRuntime runtime, VpnProfile? profile = null,
+        IProfileStore? store = null, IAndroidServiceBridge? androidBridge = null)
     {
         _runtime = runtime;
         _profile = profile;
         _store = store;
+        _androidBridge = androidBridge ?? AndroidServiceBridgeLocator.Bridge;
+
+        if (androidBridge is not null)
+            androidBridge.ServiceStateChanged += OnAndroidServiceStateChanged;
 
         _runtime.SessionUpdated += OnSessionUpdated;
         UpdateFromSnapshot(runtime.CurrentSession);
@@ -131,6 +138,31 @@ public sealed partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private async Task Connect()
     {
+        if (_androidBridge is not null)
+        {
+            switch (_androidBridge.ServiceState)
+            {
+                case AndroidServiceState.Idle:
+                    _pendingAndroidConnect = true;
+                    _androidBridge.RequestVpnPermission();
+                    return;
+                case AndroidServiceState.Preparing:
+                    return;
+            }
+        }
+
+        await ConnectRuntimeAsync();
+    }
+
+    [RelayCommand]
+    private async Task Disconnect()
+    {
+        await _runtime.DisconnectAsync();
+        _androidBridge?.StopVpnService();
+    }
+
+    private async Task ConnectRuntimeAsync()
+    {
         var profile = _profile ?? _store?.Load();
         if (profile is null)
         {
@@ -162,10 +194,18 @@ public sealed partial class DashboardViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private async Task Disconnect()
+    private void OnAndroidServiceStateChanged(AndroidServiceState state)
     {
-        await _runtime.DisconnectAsync();
+        if (state == AndroidServiceState.Revoked)
+        {
+            _ = _runtime.DisconnectAsync();
+            StatusText = "VPN permission revoked";
+        }
+        else if (state == AndroidServiceState.Running && _pendingAndroidConnect)
+        {
+            _pendingAndroidConnect = false;
+            _ = ConnectRuntimeAsync();
+        }
     }
 
     private static string FormatBytes(long bytes)

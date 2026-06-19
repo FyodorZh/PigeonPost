@@ -24,28 +24,35 @@ public partial class App : Application
     {
         RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
 
+        var services = new ServiceCollection();
+        services.AddSingleton<IProfileStore, DesktopProfileStore>();
+        services.AddSingleton<IVpnRuntime, VpnClientRuntime>();
+        services.AddSingleton<ConfigViewModel>();
+        services.AddSingleton<DashboardViewModel>();
+        services.AddSingleton<LogsViewModel>();
+        services.AddSingleton<AboutViewModel>();
+        services.AddSingleton<MainViewModel>();
+        _services = services.BuildServiceProvider();
+
+        _runtime = _services.GetRequiredService<IVpnRuntime>();
+
+        var vm = _services.GetRequiredService<MainViewModel>();
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var services = new ServiceCollection();
-            services.AddSingleton<IProfileStore, DesktopProfileStore>();
-            services.AddSingleton<IVpnRuntime, VpnClientRuntime>();
-            services.AddSingleton<ConfigViewModel>();
-            services.AddSingleton<DashboardViewModel>();
-            services.AddSingleton<LogsViewModel>();
-            services.AddSingleton<AboutViewModel>();
-            services.AddSingleton<MainViewModel>();
-            _services = services.BuildServiceProvider();
-
-            _runtime = _services.GetRequiredService<IVpnRuntime>();
-
-            var vm = _services.GetRequiredService<MainViewModel>();
-
             desktop.MainWindow = new Views.MainWindow
             {
                 DataContext = vm
             };
 
             desktop.MainWindow.Closing += OnMainWindowClosing;
+        }
+        else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
+        {
+            singleView.MainView = new Views.MainView
+            {
+                DataContext = vm
+            };
         }
 
         base.OnFrameworkInitializationCompleted();
