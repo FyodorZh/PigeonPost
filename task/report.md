@@ -232,3 +232,34 @@ PigeonPost.Tun.Tests:            Passed: 10 (unchanged)
 2. **Backing field vs property** — `MainViewModel` constructor set `_selectedTabIndex = ...` (field), bypassing `OnSelectedTabIndexChanged`. Fixed: use `SelectedTabIndex = ...`.
 3. **Missing `using` directives** — 3 files needed `System`/`System.Threading`/`System.Reflection` imports due to `<ImplicitUsings>false</ImplicitUsings>`.
 
+## Stage 07 — Pontifex Client Core
+
+### Files Created (6)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.Bridge/Protocol/HandshakeRejectedException.cs` | Typed exception with `RejectCode` property |
+| `src/PigeonPost.Vpn/NullTunDevice.cs` | Stub `ITunDevice` — blocks reads, no-op writes |
+| `src/PigeonPost.Vpn/CountingTunDevice.cs` | `ITunDevice` decorator — tracks bytes/packets via `Interlocked` |
+| `src/PigeonPost.Vpn/RuntimeLogger.cs` | Scriba `ILoggerExt` implementation routing logs to `LogEmitted` event |
+| `src/PigeonPost.Vpn/VpnClientRuntime.cs` | Real `IVpnRuntime` — owns `BridgeImpl`, transport, reconnect loop |
+| `tests/PigeonPost.Vpn.Tests/VpnClientRuntimeTests.cs` | 8 tests: connect, disconnect, reconnection, state events, guard |
+| `tests/PigeonPost.Vpn.Tests/CountingTunDeviceTests.cs` | 5 tests: byte/packet counting |
+| `tests/PigeonPost.Vpn.Tests/HandshakeRejectedExceptionTests.cs` | 4 tests: reject code, throw/catch |
+
+### Files Modified (5)
+
+| File | Change |
+|------|--------|
+| `PigeonPost.Bridge.csproj` | Added `InternalsVisibleTo` for `PigeonPost.Vpn` and `PigeonPost.Vpn.Tests` |
+| `BridgeImpl.cs` | Added `EndpointConnected` event (fires after successful handshake) |
+| `PigeonPost.Vpn.csproj` | Added project refs to `PigeonPost.Bridge` + `PigeonPost.Tun`; NuGet refs to Pontifex packages |
+| `PigeonPost.Vpn.Tests.csproj` | Added Pontifex NuGet refs |
+| `App.axaml.cs` | Switched DI from `FakeVpnRuntime` to `VpnClientRuntime` |
+
+### Test Results
+```
+PigeonPost.Vpn.Tests:            Passed: 53 (was 38, +15 new)
+PigeonPost.Bridge.Tests:         Passed: 77 (unchanged)
+```
+

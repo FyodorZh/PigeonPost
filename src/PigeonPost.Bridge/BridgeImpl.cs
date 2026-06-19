@@ -29,6 +29,7 @@ public sealed class BridgeImpl : IBridge, IDisposable
     private long _droppedPackets;
 
     public event Action<StopReason>? OnStopped;
+    public event Action<IAckRawBaseEndpoint>? EndpointConnected;
 
     public BridgeImpl(ITunDevice tun, IPacketBuffer buffer, ILogger logger, bool verbose = false)
     {
@@ -127,6 +128,7 @@ public sealed class BridgeImpl : IBridge, IDisposable
         }
 
         _logger.i("Pontifex endpoint connected.");
+        EndpointConnected?.Invoke(endpoint);
 
         while (_running && _buffer.TryDequeue(out byte[] packet))
         {

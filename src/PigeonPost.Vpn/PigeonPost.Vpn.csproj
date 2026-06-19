@@ -5,7 +5,16 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="Pontifex" Version="0.1.2-dev.0" />
+    <PackageReference Include="Pontifex.Transport.Direct" Version="0.1.1-dev.0" />
+    <PackageReference Include="Pontifex.Transport.Tcp" Version="0.1.1-dev.0" />
+    <PackageReference Include="Scriba" Version="0.2.3-dev.0" />
+    <PackageReference Include="Scriba.JsonFactory" Version="0.2.1-dev.0" />
     <InternalsVisibleTo Include="PigeonPost.Vpn.Tests" />
     <InternalsVisibleTo Include="PigeonPost.VpnClientView.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PigeonPost.Bridge\PigeonPost.Bridge.csproj" />
+    <ProjectReference Include="..\PigeonPost.Tun\PigeonPost.Tun.csproj" />
   </ItemGroup>
 </Project>

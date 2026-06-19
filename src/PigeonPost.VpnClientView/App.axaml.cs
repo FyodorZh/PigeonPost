@@ -22,7 +22,7 @@ public partial class App : Application
         {
             var services = new ServiceCollection();
             services.AddSingleton<IProfileStore, DesktopProfileStore>();
-            services.AddSingleton<IVpnRuntime, FakeVpnRuntime>();
+            services.AddSingleton<IVpnRuntime, VpnClientRuntime>();
             services.AddSingleton<ConfigViewModel>();
             services.AddSingleton<DashboardViewModel>();
             services.AddSingleton<LogsViewModel>();
