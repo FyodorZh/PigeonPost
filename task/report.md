@@ -321,3 +321,55 @@ Correct JDK 17 location for Android builds:
 PigeonPost.Vpn.Tests:            Passed: 79 (was 53, +26 new)
 ```
 
+## Stage 10 — Endpoint Isolation
+
+### Files Created (2)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.Bridge/VpnSubnetClassifier.cs` | Static classifier for VPN subnet roles (Linux vs endpoint vs server) |
+| `tests/PigeonPost.Bridge.Tests/VpnSubnetClassifierTests.cs` | 12 tests: range boundary classification |
+| `tests/PigeonPost.Bridge.Tests/Server/ServerHubIsolationTests.cs` | 10 tests: full allowed/denied matrix |
+
+### Files Modified (3)
+
+| File | Change |
+|------|--------|
+| `IServerHub.cs` | Added `DroppedIsolationPolicy` counter |
+| `ServerHub.cs` | Added isolation check in `OnPacketFromClient()` — endpoint→VPN-peer dropped, Linux→endpoint dropped |
+| `FakeServerHub.cs` | Added `DroppedIsolationPolicy` property |
+
+### Isolation Logic
+```
+OnPacketFromClient → if dest in 10.0.10.0/24 AND dest ≠ 10.0.10.1:
+  if source is endpoint (11-254): DROP
+  if source is Linux AND dest is endpoint: DROP
+else: write to TUN (internet-bound or server-bound allowed)
+```
+
+### Test Results
+```
+PigeonPost.Bridge.Tests:  Passed: 99 (was 77, +22 new)
+```
+
+## Android Build Fix
+
+### Problem
+Android project failed due to JDK 11 default; needs JDK 17.
+
+### Solution
+Created `src/PigeonPost.VpnClientView.Android/Directory.Build.props`:
+```xml
+<Project>
+  <PropertyGroup>
+    <JavaSdkDirectory>/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home</JavaSdkDirectory>
+  </PropertyGroup>
+</Project>
+```
+
+### Result
+Full solution (`dotnet build`) — 0 errors, all 14 projects build successfully. Only 4 cosmetic XA0141 warnings remain (SkiaSharp page alignment).
+
+### Note to Future Implementers
+The Java/JDK issue is fixed. Do not spend time troubleshooting Android build failures — `JavaSdkDirectory` is already set in the Android project's `Directory.Build.props`. If the build still fails, check that the JDK exists at the configured path.
+

@@ -27,6 +27,7 @@ public class ServerHub : IServerHub, IDisposable
     public long DroppedInvalidSource { get; private set; }
     public long DroppedMalformedIpv4 { get; private set; }
     public long DroppedNonIpv4 { get; private set; }
+    public long DroppedIsolationPolicy { get; private set; }
 
     public ServerHub(ILogger logger, ITunDevice? tun = null)
     {
@@ -141,6 +142,26 @@ public class ServerHub : IServerHub, IDisposable
             {
                 DroppedInvalidSource++;
                 _logger.w($"Invalid source IP from host={hostIp}: expected={session.AdvertisedHostIpv4}, got={(IPv4)info.SourceAddress}");
+                return;
+            }
+        }
+
+        var sourceIp = hostIp.Value;
+        var destIp = info.DestinationAddress;
+
+        if (VpnSubnetClassifier.IsInVpnSubnet(destIp) && !VpnSubnetClassifier.IsServerIp(destIp))
+        {
+            if (VpnSubnetClassifier.IsEndpointClient(sourceIp))
+            {
+                DroppedIsolationPolicy++;
+                _logger.w($"Isolation policy: endpoint client not allowed to reach VPN peer {(IPv4)destIp}");
+                return;
+            }
+
+            if (VpnSubnetClassifier.IsLinuxClient(sourceIp) && VpnSubnetClassifier.IsEndpointClient(destIp))
+            {
+                DroppedIsolationPolicy++;
+                _logger.w($"Isolation policy: Linux client not allowed to reach endpoint peer {(IPv4)destIp}");
                 return;
             }
         }

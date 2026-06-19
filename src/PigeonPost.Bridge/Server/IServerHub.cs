@@ -15,4 +15,5 @@ public interface IServerHub
     long DroppedInvalidSource { get; }
     long DroppedMalformedIpv4 { get; }
     long DroppedNonIpv4 { get; }
+    long DroppedIsolationPolicy { get; }
 }

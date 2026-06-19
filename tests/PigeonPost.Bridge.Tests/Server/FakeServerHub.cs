@@ -20,6 +20,7 @@ internal sealed class FakeServerHub : IServerHub
     public long DroppedInvalidSource { get; private set; }
     public long DroppedMalformedIpv4 { get; private set; }
     public long DroppedNonIpv4 { get; private set; }
+    public long DroppedIsolationPolicy { get; set; }
 
     public List<byte[]> PacketsWrittenToTun { get; } = new();
     public Dictionary<string, List<byte[]>> PacketsSentToClient { get; } = new();
