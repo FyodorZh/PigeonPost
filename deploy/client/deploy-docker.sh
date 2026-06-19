@@ -6,6 +6,8 @@ cd "$(dirname "$0")"
 PIGEON_URL="tcp|203.0.113.10:9000/30"
 export PIGEON_URL
 
+# Using endpoint client IP from 10.0.10.11-254 range
+# For Linux clients, use TUN_CIDR=10.0.10.2/24 through 10.0.10.10/24
 TUN_CIDR="${TUN_CIDR:-10.0.10.11/24}"
 PEER_IP="${PEER_IP:-10.0.10.1}"
 TUN_IP="${TUN_CIDR%/*}"

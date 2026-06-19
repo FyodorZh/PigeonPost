@@ -5,9 +5,13 @@
 #
 # Usage: ./setup.sh <wan_interface>
 #
-# Provisions a single VPN client subnet on tun0, NATs it to the WAN,
-# and allows forwarding through the tunnel. All clients (Linux TUN and
-# future endpoint) use unique host IPs from this one subnet.
+# Unified subnet model: 10.0.10.0/24
+#   Server TUN: 10.0.10.1/24 on tun0
+#   Linux clients:    10.0.10.2-10
+#   Endpoint clients: 10.0.10.11-254
+#
+# Provisions the TUN device, NATs the subnet to the WAN,
+# and allows forwarding through the tunnel.
 #
 set -euo pipefail
 

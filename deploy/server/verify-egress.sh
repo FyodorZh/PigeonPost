@@ -55,6 +55,10 @@ else
 fi
 
 echo ""
+echo "--- Endpoint isolation policy ---"
+check "kernel accepts DROP target" sh -c "iptables -A FORWARD -j DROP 2>/dev/null && iptables -D FORWARD -j DROP 2>/dev/null"
+
+echo ""
 echo "--- FORWARD rules ---"
 if [ -n "$WAN_IF" ]; then
     check "FORWARD $TUN_NET $TUN -> $WAN_IF" iptables -C FORWARD -i "$TUN" -o "$WAN_IF" -s "$TUN_NET" -j ACCEPT

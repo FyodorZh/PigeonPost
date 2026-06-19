@@ -280,9 +280,12 @@ single VPN client subnet on the server TUN interface. Key contract:
 
 - **Client subnet**: `10.0.10.0/24` — all VPN-capable clients use this space.
 - **Server TUN address**: `10.0.10.1/24` — assigned to the server TUN device.
+- **Linux client range**: `10.0.10.2–10` — full peer reachability (can reach all clients).
+- **Endpoint/mobile client range**: `10.0.10.11–254` — isolated from other VPN peers (can only reach server and internet).
 - Each client advertises one unique host IP from `10.0.10.0/24`.
 - The connected route for `10.0.10.0/24` via `tun0` is the return-path mechanism for de-NATed replies.
 - The server NATs the full `10.0.10.0/24` subnet to the WAN.
+- Endpoint isolation is enforced by `VpnSubnetClassifier` in the packet path: endpoint→VPN-peer and Linux→endpoint packets are dropped.
 
 ### Shared entrypoint script (`docker/docker-entrypoint.sh`)
 Reads env vars `TUN_NAME`, `TUN_CIDR`, and optional `PEER_IP`. Creates the TUN device,

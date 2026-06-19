@@ -487,4 +487,29 @@ PigeonPost.VpnClientView.Tests:  Passed: 60 (+3 new)
 PigeonPost.Vpn.Tests:            Passed: 102 (+1 new)
 ```
 
+## Stage 15 — Deployment Contract
+
+### Files Created (1)
+
+| File | Purpose |
+|------|---------|
+| `deploy/NETWORK-CONTRACT.md` | Operator guide: IP ranges, allocation rules, server/client requirements |
+
+### Files Modified (7)
+
+| File | Change |
+|------|--------|
+| `deploy/server/verify-egress.sh` | Added endpoint isolation policy check (kernel accepts DROP) |
+| `deploy/client/deploy-docker.sh` | Added endpoint/Linux client range comments |
+| `deploy/client/deploy-plain.sh` | Same range comments |
+| `deploy/server/deploy-docker.sh` | Added unified subnet model comment with ranges |
+| `deploy/server/deploy-plain.sh` | Same |
+| `deploy/server/pre-deploy.sh` | Added unified subnet model header comment |
+| `AGENTS.md` | Expanded VPN client subnet section with ranges + isolation note |
+
+### Verification
+- All 6 shell scripts pass `bash -n`
+- `dotnet test` — 293 tests all pass
+
+
 
