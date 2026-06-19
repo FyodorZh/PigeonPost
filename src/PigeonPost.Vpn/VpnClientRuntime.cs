@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Pontifex;
@@ -41,6 +43,7 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
     private ITransport? _transport;
     private TaskCompletionSource? _transportStoppedTcs;
     private CancellationTokenSource? _connectCts;
+    private readonly ISocketProtector? _socketProtector;
     private Timer? _statsTimer;
     private long _prevBytesSent;
     private long _prevBytesReceived;
@@ -64,9 +67,32 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
     public event Action<VpnSessionSnapshot>? SessionUpdated;
     public event Action<VpnLogEntry>? LogEmitted;
 
-    public VpnClientRuntime(bool verbose = false)
+    public VpnClientRuntime(bool verbose = false, ISocketProtector? socketProtector = null)
     {
         _verbose = verbose;
+        _socketProtector = socketProtector;
+    }
+
+    private void ProtectEndpointSocket(Pontifex.Abstractions.Endpoints.IAckRawBaseEndpoint endpoint)
+    {
+        var protector = _socketProtector;
+        if (protector == null)
+            return;
+
+        List<IControl> controls = [];
+        endpoint.GetControls(controls, c => c is ISocketUnsafeAccessor);
+        if (controls.Count == 0)
+        {
+            EmitLog("No ISocketUnsafeAccessor found — socket protection skipped (Direct transport?)", VpnLogLevel.Warning);
+            return;
+        }
+
+        var socket = ((ISocketUnsafeAccessor)controls[0]).GetSocketUnsafe();
+        if (socket != null)
+        {
+            bool result = protector.ProtectSocket(socket);
+            EmitLog(result ? "Transport socket protected" : "Transport socket protection FAILED", result ? VpnLogLevel.Info : VpnLogLevel.Error);
+        }
     }
 
     private static TransportFactory CreateTransportFactory()
@@ -188,6 +214,8 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
         {
             _bridge!.EndpointConnected -= onConnected;
             _bridge!.OnStopped -= onStopped;
+
+            ProtectEndpointSocket(ep);
 
             lock (_lock)
             {
@@ -351,6 +379,8 @@ public sealed class VpnClientRuntime : IVpnRuntime, IDisposable
             {
                 _bridge!.EndpointConnected -= onReconnected;
                 _bridge!.OnStopped -= onReconnectStopped;
+
+                ProtectEndpointSocket(ep);
 
                 lock (_lock)
                 {

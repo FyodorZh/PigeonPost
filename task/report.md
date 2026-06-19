@@ -373,3 +373,31 @@ Full solution (`dotnet build`) — 0 errors, all 14 projects build successfully.
 ### Note to Future Implementers
 The Java/JDK issue is fixed. Do not spend time troubleshooting Android build failures — `JavaSdkDirectory` is already set in the Android project's `Directory.Build.props`. If the build still fails, check that the JDK exists at the configured path.
 
+## Stage 11 — Android Protect Hook
+
+### Files Created (3)
+
+| File | Purpose |
+|------|---------|
+| `src/PigeonPost.Vpn/ISocketProtector.cs` | Interface: `bool ProtectSocket(Socket socket)` |
+| `src/PigeonPost.Vpn/NullSocketProtector.cs` | No-op returning `true` for desktop/fallback |
+| `tests/PigeonPost.Vpn.Tests/NullSocketProtectorTests.cs` | 2 tests: returns true, handles null |
+
+### Files Modified (5)
+
+| File | Change |
+|------|--------|
+| `PigeonPost.Vpn.csproj` | `Pontifex.Transport.Tcp` → 0.1.2-dev.0 |
+| `PigeonPost.Bridge.csproj` | `Pontifex.Transport.Tcp` → 0.1.2-dev.0 |
+| `PigeonPost.csproj` | `Pontifex.Transport.Tcp` → 0.1.2-dev.0 |
+| `PigeonPost.Bridge.Tests.csproj` | `Pontifex.Transport.Tcp` → 0.1.2-dev.0 |
+| `VpnClientRuntime.cs` | Added `ISocketProtector` constructor param, `ProtectEndpointSocket()` called on connect/reconnect |
+
+### How It Works
+After Pontifex handshake completes (`EndpointConnected` event), `ProtectEndpointSocket()` uses `ISocketUnsafeAccessor` via `GetControls` to extract the underlying `Socket` and calls `ISocketProtector.ProtectSocket(socket)`. On Android, `VpnService.protect()` would be called here. Direct transport has no socket — logs warning and continues.
+
+### Test Results
+```
+PigeonPost.Vpn.Tests:            Passed: 81 (was 79, +2 new)
+```
+
