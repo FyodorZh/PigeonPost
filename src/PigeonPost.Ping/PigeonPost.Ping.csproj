@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>PigeonPost.Ping</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Pontifex" Version="0.1.2-dev.0" />
+    <PackageReference Include="Pontifex.Transport.Tcp" Version="0.1.2-dev.0" />
+    <PackageReference Include="Scriba" Version="0.2.3-dev.0" />
+  </ItemGroup>
+</Project>
