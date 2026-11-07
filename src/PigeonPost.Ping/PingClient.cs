@@ -21,13 +21,14 @@ internal sealed class PingClient
 {
     private readonly PingOptions _options;
     private readonly ILogger _logger;
+    private readonly PingLog _log;
+    private readonly ulong _clientId = PingProtocol.CreateId();
     private readonly TransportFactory _transportFactory = new();
     private readonly CancellationTokenSource _cts = new();
     private readonly ConcurrentDictionary<uint, PendingProbe> _pending = new();
     private readonly List<Task> _probeTasks = new();
     private readonly PingStats _stats = new();
     private readonly object _sendLock = new();
-    private readonly object _consoleLock = new();
     private readonly TaskCompletionSource<IAckRawServerEndpoint> _connected =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<StopReason?> _stopped =
@@ -35,21 +36,44 @@ internal sealed class PingClient
 
     private ITransport? _transport;
     private IAckRawServerEndpoint? _endpoint;
+    private CancellationTokenSource? _statusCts;
+    private Task? _statusTask;
+    private ulong _sessionId;
+    private long _connectStartedTicks;
+    private long _connectedAtTicks;
+    private long _protocolErrors;
+    private StopReason? _lastStopReason;
     private volatile bool _shutdownRequested;
     private volatile bool _finished;
     private volatile bool _connectionLost;
     private string? _connectionError;
 
-    public PingClient(PingOptions options, ILogger logger)
+    public PingClient(PingOptions options, ILogger logger, PingLog log)
     {
         _options = options;
         _logger = logger;
+        _log = log;
         _transportFactory.Register(new AckRawTcpClientProducer());
     }
 
+    public ulong ClientId => _clientId;
+
+    public string ClientIdHex => PingProtocol.FormatId(_clientId);
+
+    public string SessionIdHex => PingProtocol.FormatId(_sessionId);
+
     public async Task<int> RunAsync()
     {
-        WriteLine($"PING {_options.Url}: {_options.PayloadSize} data bytes, interval={_options.IntervalMs} ms, timeout={_options.WaitMs} ms");
+        _log.Event(
+            "startup",
+            ("protocol", PingProtocol.Version),
+            ("client", ClientIdHex),
+            ("url", _options.Url),
+            ("interval_ms", _options.IntervalMs),
+            ("size", _options.PayloadSize),
+            ("wait_ms", _options.WaitMs),
+            ("count", _options.Count),
+            ("status_ms", _options.StatusMs));
 
         ITransport? transport;
         try
@@ -58,30 +82,68 @@ internal sealed class PingClient
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error: failed to create transport: {ex.Message}");
+            _log.Error("connect_fail", ("client", ClientIdHex), ("detail", ex.Message));
             return 1;
         }
 
         if (transport is not IAckRawClient client)
         {
-            Console.Error.WriteLine("Error: transport is not an acknowledged raw client.");
+            _log.Error("connect_fail", ("client", ClientIdHex), ("detail", "transport is not an acknowledged raw client"));
             return 1;
         }
 
+        _log.Event("connect_begin", ("client", ClientIdHex), ("remote", _options.Url));
+
         client.Init(new PingClientHandler(this));
         _transport = transport;
-        client.Start(OnTransportStopped);
+        _connectStartedTicks = Stopwatch.GetTimestamp();
+        if (!client.Start(OnTransportStopped))
+        {
+            _log.Error(
+                "connect_fail",
+                ("client", ClientIdHex),
+                ("elapsed_ms", ElapsedMs(_connectStartedTicks)),
+                ("detail", "transport failed to start"));
+            return 1;
+        }
 
         Task first = await Task.WhenAny(_connected.Task, _stopped.Task);
         if (first != _connected.Task)
         {
             StopReason? reason = await _stopped.Task;
-            Console.Error.WriteLine(_connectionError ?? $"Error: connection failed ({reason?.Type ?? "unknown"}).");
+            var fields = new List<(string Key, object? Value)>
+            {
+                ("client", ClientIdHex),
+                ("elapsed_ms", ElapsedMs(_connectStartedTicks)),
+                ("detail", _connectionError ?? "-")
+            };
+            if (reason != null)
+            {
+                fields.AddRange(PingLog.ReasonFields(reason));
+            }
+
+            _log.Error("connect_fail", fields.ToArray());
             _transport.Stop(StopReason.UserIntention);
             return 1;
         }
 
         _endpoint = await _connected.Task;
+        _connectedAtTicks = Stopwatch.GetTimestamp();
+
+        _log.Event(
+            "connected",
+            ("session", SessionIdHex),
+            ("client", ClientIdHex),
+            ("remote", _endpoint.RemoteEndPoint),
+            ("connect_ms", ElapsedMs(_connectStartedTicks)),
+            ("protocol", PingProtocol.Version));
+
+        if (_options.StatusMs > 0)
+        {
+            _statusCts = new CancellationTokenSource();
+            _statusTask = StatusLoopAsync(_statusCts.Token);
+        }
+
         int exitCode = 0;
 
         try
@@ -93,18 +155,36 @@ internal sealed class PingClient
         }
         finally
         {
+            if (_statusCts != null)
+            {
+                _statusCts.Cancel();
+                if (_statusTask != null)
+                {
+                    try
+                    {
+                        await _statusTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+            }
+
             PingSummary summary = _stats.Snapshot();
-            WriteLine("--- PigeonPost.Ping statistics ---");
-            WriteLine(string.Format(
+            WriteStatusLine(summary, "final");
+
+            _log.Raw("--- PigeonPost.Ping statistics ---");
+            _log.Raw(string.Format(
                 CultureInfo.InvariantCulture,
-                "{0} packets transmitted, {1} received, {2} corrupted, {3:F0}% packet loss",
+                "{0} packets transmitted, {1} received, {2} timeouts, {3} corrupted, {4:F0}% packet loss",
                 summary.Transmitted,
                 summary.Received,
+                summary.Timeouts,
                 summary.Corrupted,
                 summary.LossPercent));
             if (summary.Received > 0)
             {
-                WriteLine(string.Format(
+                _log.Raw(string.Format(
                     CultureInfo.InvariantCulture,
                     "rtt min/avg/max = {0:F2}/{1:F2}/{2:F2} ms",
                     summary.MinRtt,
@@ -112,12 +192,17 @@ internal sealed class PingClient
                     summary.MaxRtt));
             }
 
+            LogVerdict(summary);
+
             _finished = true;
             _transport.Stop(StopReason.UserIntention);
             _cts.Cancel();
 
             if (!_shutdownRequested &&
-                (_connectionLost || summary.Received != summary.Transmitted || summary.Corrupted > 0))
+                (_connectionLost ||
+                 _protocolErrors > 0 ||
+                 summary.Received != summary.Transmitted ||
+                 summary.Corrupted > 0))
             {
                 exitCode = 2;
             }
@@ -139,25 +224,42 @@ internal sealed class PingClient
         _stopped.TrySetResult(null);
     }
 
-    public void OnConnected(IAckRawServerEndpoint endpoint)
+    public void OnConnected(IAckRawServerEndpoint endpoint, ulong sessionId)
     {
+        _sessionId = sessionId;
         _endpoint = endpoint;
         _connected.TrySetResult(endpoint);
     }
 
-    public void OnHandshakeRejected(string message)
+    public void OnHandshakeRejected(string reason, int serverVersion)
     {
-        _connectionError = message;
+        _connectionError = reason;
+        _log.Error(
+            "handshake_reject",
+            ("client", ClientIdHex),
+            ("reason", reason),
+            ("server_protocol", serverVersion),
+            ("protocol", PingProtocol.Version));
         _stopped.TrySetResult(null);
         _cts.Cancel();
     }
 
     public void OnReply(byte[] frame)
     {
+        if (_finished || _shutdownRequested)
+        {
+            return;
+        }
+
         if (!PingProtocol.TryDecodeFrame(frame, out uint sequence, out _, out _))
         {
             _stats.RecordCorrupted();
-            WriteLine("Received a malformed reply.");
+            _log.Event(
+                "corrupt",
+                ("session", SessionIdHex),
+                ("client", ClientIdHex),
+                ("kind", "malformed_frame"),
+                ("length", frame.Length));
             return;
         }
 
@@ -167,16 +269,36 @@ internal sealed class PingClient
         }
         else
         {
-            WriteLine($"Received an unexpected reply for seq={sequence}");
+            Interlocked.Increment(ref _protocolErrors);
+            _log.Event(
+                "protocol_error",
+                ("session", SessionIdHex),
+                ("client", ClientIdHex),
+                ("kind", "unexpected_reply"),
+                ("seq", sequence));
         }
     }
 
     private void OnTransportStopped(StopReason reason)
     {
+        _lastStopReason = reason;
+
         if (!_shutdownRequested && !_finished && _connected.Task.IsCompleted)
         {
             _connectionLost = true;
-            WriteError($"Connection lost: {reason.Type}");
+            PingSummary summary = _stats.Snapshot();
+            var fields = new List<(string Key, object? Value)>
+            {
+                ("session", SessionIdHex),
+                ("client", ClientIdHex),
+                ("duration_ms", ElapsedMs(_connectedAtTicks)),
+                ("sent", summary.Transmitted),
+                ("received", summary.Received),
+                ("timeouts", summary.Timeouts),
+                ("corrupt", summary.Corrupted)
+            };
+            fields.AddRange(PingLog.ReasonFields(reason));
+            _log.Warn("transport_stop", fields.ToArray());
         }
 
         _stopped.TrySetResult(reason);
@@ -227,8 +349,24 @@ internal sealed class PingClient
         if (result != SendResult.Ok)
         {
             _pending.TryRemove(sequence, out _);
-            WriteLine($"Send failed for seq={sequence}: {result}");
+            _stats.RecordTimeout();
+            _log.Warn(
+                "probe_send_failed",
+                ("session", SessionIdHex),
+                ("client", ClientIdHex),
+                ("seq", sequence),
+                ("result", result.ToString()));
             return;
+        }
+
+        if (_log.Verbose)
+        {
+            _log.Event(
+                "probe_tx",
+                ("session", SessionIdHex),
+                ("client", ClientIdHex),
+                ("seq", sequence),
+                ("bytes", frame.Length));
         }
 
         Task timeoutTask = Task.Delay(_options.WaitMs, token);
@@ -245,7 +383,16 @@ internal sealed class PingClient
         _pending.TryRemove(sequence, out _);
         if (!token.IsCancellationRequested)
         {
-            WriteLine($"Request timeout for seq={sequence}");
+            _stats.RecordTimeout();
+            PingSummary summary = _stats.Snapshot();
+            _log.Event(
+                "probe_timeout",
+                ("session", SessionIdHex),
+                ("client", ClientIdHex),
+                ("seq", sequence),
+                ("waited_ms", _options.WaitMs),
+                ("sent", summary.Transmitted),
+                ("received", summary.Received));
         }
     }
 
@@ -278,56 +425,156 @@ internal sealed class PingClient
                 out ReadOnlySpan<byte> replyPayload))
         {
             _stats.RecordCorrupted();
-            WriteLine($"Corrupted reply for seq={sequence}: malformed frame");
+            _log.Event(
+                "corrupt",
+                ("session", SessionIdHex),
+                ("client", ClientIdHex),
+                ("seq", sequence),
+                ("kind", "malformed_frame"),
+                ("length", replyFrame.Length));
             return;
         }
 
         if (replySequence != sequence)
         {
             _stats.RecordCorrupted();
-            WriteLine($"Corrupted reply for seq={sequence}: sequence mismatch ({replySequence})");
+            _log.Event(
+                "corrupt",
+                ("session", SessionIdHex),
+                ("client", ClientIdHex),
+                ("seq", sequence),
+                ("kind", "sequence_mismatch"),
+                ("actual", replySequence));
             return;
         }
 
         if (replyTimestamp != sentTimestamp)
         {
             _stats.RecordCorrupted();
-            WriteLine($"Corrupted reply for seq={sequence}: timestamp mismatch");
+            _log.Event(
+                "corrupt",
+                ("session", SessionIdHex),
+                ("client", ClientIdHex),
+                ("seq", sequence),
+                ("kind", "timestamp_mismatch"));
             return;
         }
 
         if (!PingProtocol.IsReversedCopy(payload, replyPayload))
         {
             _stats.RecordCorrupted();
-            WriteLine($"Corrupted reply for seq={sequence}: payload mismatch");
+            _log.Event(
+                "corrupt",
+                ("session", SessionIdHex),
+                ("client", ClientIdHex),
+                ("seq", sequence),
+                ("kind", "payload_mismatch"));
             return;
         }
 
         double rtt = Stopwatch.GetElapsedTime(sentTimestamp).TotalMilliseconds;
         _stats.RecordReply(rtt);
-        WriteLine(string.Format(
-            CultureInfo.InvariantCulture,
-            "{0} bytes from {1}: seq={2} time={3:F2} ms",
-            replyPayload.Length,
-            _endpoint?.RemoteEndPoint,
-            sequence,
-            rtt));
+        _log.Event(
+            "reply_rx",
+            ("session", SessionIdHex),
+            ("client", ClientIdHex),
+            ("seq", sequence),
+            ("bytes", replyPayload.Length),
+            ("rtt_ms", rtt));
     }
 
-    private void WriteLine(string message)
+    private async Task StatusLoopAsync(CancellationToken token)
     {
-        lock (_consoleLock)
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_options.StatusMs));
+        try
         {
-            Console.Out.WriteLine(message);
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                WriteStatusLine(_stats.Snapshot(), "periodic");
+            }
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 
-    private void WriteError(string message)
+    private void WriteStatusLine(PingSummary summary, string phase)
     {
-        lock (_consoleLock)
+        string status = _connectionLost
+            ? "terminated"
+            : summary.Corrupted > 0 || Interlocked.Read(ref _protocolErrors) > 0
+                ? "degraded"
+                : summary.Transmitted == 0
+                    ? "waiting"
+                    : summary.Received == summary.Transmitted
+                        ? "ok"
+                        : "degraded";
+
+        _log.Event(
+            "status",
+            ("session", SessionIdHex),
+            ("client", ClientIdHex),
+            ("phase", phase),
+            ("status", status),
+            ("sent", summary.Transmitted),
+            ("received", summary.Received),
+            ("timeouts", summary.Timeouts),
+            ("corrupt", summary.Corrupted),
+            ("protocol_errors", Interlocked.Read(ref _protocolErrors)),
+            ("last_reply_age_ms", summary.LastReplyAgeMs),
+            ("uptime_ms", ElapsedMs(_connectedAtTicks)));
+    }
+
+    private void LogVerdict(PingSummary summary)
+    {
+        string result;
+        string detail;
+        long protocolErrors = Interlocked.Read(ref _protocolErrors);
+
+        if (summary.Corrupted > 0 || protocolErrors > 0)
         {
-            Console.Error.WriteLine(message);
+            result = summary.Corrupted > 0 ? "CORRUPTION" : "PROTOCOL_ERROR";
+            detail = summary.Corrupted > 0
+                ? "received replies failed verification"
+                : "protocol-level inconsistencies were observed";
         }
+        else if (_connectionLost)
+        {
+            result = "TERMINATED";
+            StopReason? cause = _lastStopReason == null ? null : PingLog.Unwrap(_lastStopReason);
+            detail = $"transport stopped: {cause?.Type ?? "unknown"}";
+        }
+        else if (summary.Transmitted == 0)
+        {
+            result = "NO_PROBES";
+            detail = "no probes were sent";
+        }
+        else if (summary.Received != summary.Transmitted)
+        {
+            result = _shutdownRequested ? "INTERRUPTED" : "INCOMPLETE";
+            detail = summary.Received == 0
+                ? "sends succeeded but no replies were received"
+                : "some probes did not receive a verified reply";
+        }
+        else
+        {
+            result = "OK";
+            detail = "all probes were replied to and verified";
+        }
+
+        _log.Event(
+            "verdict",
+            ("session", SessionIdHex),
+            ("client", ClientIdHex),
+            ("result", result),
+            ("detail", detail));
+    }
+
+    private static long ElapsedMs(long startTicks)
+    {
+        return startTicks == 0
+            ? 0
+            : (long)Stopwatch.GetElapsedTime(startTicks).TotalMilliseconds;
     }
 
     private sealed class PendingProbe
@@ -340,11 +587,12 @@ internal sealed class PingClient
 internal sealed class PingClientHandler : IAckRawClientHandler
 {
     private readonly PingClient _client;
-    private readonly byte[] _handshake = PingProtocol.CreateHandshake();
+    private readonly byte[] _handshake;
 
     public PingClientHandler(PingClient client)
     {
         _client = client;
+        _handshake = PingProtocol.CreateHandshake(client.ClientId);
     }
 
     public void WriteAckData(UnionDataList ackData)
@@ -363,14 +611,23 @@ internal sealed class PingClientHandler : IAckRawClientHandler
             ackData.Release();
         }
 
-        if (ackBytes == null || !PingProtocol.IsValidHandshake(ackBytes))
+        if (ackBytes == null)
         {
-            _client.OnHandshakeRejected("Error: server rejected the PigeonPost.Ping handshake.");
+            _client.OnHandshakeRejected("missing_payload", -1);
             endPoint.Disconnect(StopReason.UserIntention);
             return;
         }
 
-        _client.OnConnected(endPoint);
+        if (!PingProtocol.TryDecodeHandshakeAck(ackBytes, out ulong sessionId))
+        {
+            _client.OnHandshakeRejected(
+                PingProtocol.DescribeTokenFailure(ackBytes),
+                PingProtocol.GetTokenVersion(ackBytes));
+            endPoint.Disconnect(StopReason.UserIntention);
+            return;
+        }
+
+        _client.OnConnected(endPoint, sessionId);
     }
 
     public void OnReceived(UnionDataList receivedBuffer)

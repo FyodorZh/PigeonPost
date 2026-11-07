@@ -14,5 +14,6 @@ internal sealed class PingOptions
     public int PayloadSize { get; init; } = 100;
     public int WaitMs { get; init; } = 5000;
     public int Count { get; init; }
+    public int StatusMs { get; init; } = 10000;
     public bool Verbose { get; init; }
 }

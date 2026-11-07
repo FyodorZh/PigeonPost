@@ -28,6 +28,7 @@ internal static class PingCliParser
         int payloadSize = 100;
         int waitMs = 5000;
         int count = 0;
+        int statusMs = 10000;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -99,6 +100,17 @@ internal static class PingCliParser
                     countSet = true;
                     break;
 
+                case "--status":
+                    if (++i >= args.Length)
+                    {
+                        return Fail(stderr, "Missing value for --status.");
+                    }
+                    if (!TryParseNonNegative(args[i], out statusMs))
+                    {
+                        return Fail(stderr, $"Invalid status interval: '{args[i]}'.");
+                    }
+                    break;
+
                 case "-v" or "--verbose":
                     verbose = true;
                     break;
@@ -151,6 +163,11 @@ internal static class PingCliParser
             return Fail(stderr, "--wait must be at least 1 ms.");
         }
 
+        if (statusMs < 0)
+        {
+            return Fail(stderr, "--status must be 0 or greater.");
+        }
+
         options = new PingOptions
         {
             Mode = listen ? PingMode.Server : PingMode.Client,
@@ -159,6 +176,7 @@ internal static class PingCliParser
             PayloadSize = payloadSize,
             WaitMs = waitMs,
             Count = count,
+            StatusMs = statusMs,
             Verbose = verbose
         };
 
@@ -188,7 +206,7 @@ internal static class PingCliParser
         w.WriteLine("SYNOPSIS");
         w.WriteLine("    PigeonPost.Ping -l <url>");
         w.WriteLine("    PigeonPost.Ping <url> [-i <ms>] [-s <bytes>] [-w <ms>]");
-        w.WriteLine("                     [-c <count>] [-v]");
+        w.WriteLine("                     [-c <count>] [--status <ms>] [-v]");
         w.WriteLine();
         w.WriteLine("DESCRIPTION");
         w.WriteLine("    PigeonPost.Ping runs either a Pontifex server or client and checks");
@@ -225,8 +243,13 @@ internal static class PingCliParser
         w.WriteLine("        Number of messages to send before stopping and printing a");
         w.WriteLine("        summary. Default: 0 (run until interrupted).");
         w.WriteLine();
+        w.WriteLine("    --status <ms>");
+        w.WriteLine("        Milliseconds between periodic status lines. Use 0 to");
+        w.WriteLine("        disable status lines. Default: 10000.");
+        w.WriteLine();
         w.WriteLine("    -v, --verbose");
-        w.WriteLine("        Write Pontifex transport diagnostics to stderr.");
+        w.WriteLine("        Log every frame and include transport log tags (endpoint");
+        w.WriteLine("        and socket details) in stderr diagnostics.");
         w.WriteLine();
         w.WriteLine("    -h, --help");
         w.WriteLine("        Display this help and exit.");
@@ -235,6 +258,17 @@ internal static class PingCliParser
         w.WriteLine("    PigeonPost.Ping -l 'tcp|0.0.0.0:9700/30'");
         w.WriteLine("    PigeonPost.Ping 'tcp|127.0.0.1:9700/30' -c 10");
         w.WriteLine("    PigeonPost.Ping 'tcp|127.0.0.1:9700/30' -i 500 -s 1024 -w 2000");
+        w.WriteLine();
+        w.WriteLine("DIAGNOSTICS");
+        w.WriteLine("    Application events are written to stdout as:");
+        w.WriteLine("      <UTC time> role=<role> event=<name> key=value...");
+        w.WriteLine();
+        w.WriteLine("    Transport lifecycle logs are written to stderr with");
+        w.WriteLine("    event=transport. The client and server both emit session and");
+        w.WriteLine("    client correlation IDs, periodic event=status lines, and a final");
+        w.WriteLine("    event=verdict line. A healthy run ends with:");
+        w.WriteLine("      client: event=verdict result=OK");
+        w.WriteLine("      server: event=session_close ... verdict=HEALTHY");
         w.WriteLine();
         w.WriteLine("EXIT STATUS");
         w.WriteLine("    0    All probes were replied to and verified, or the run was");

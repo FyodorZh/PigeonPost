@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace PigeonPost.Ping;
 
 internal sealed class PingStats
@@ -5,7 +7,9 @@ internal sealed class PingStats
     private readonly object _lock = new();
     private long _transmitted;
     private long _received;
+    private long _timeouts;
     private long _corrupted;
+    private long _lastReplyTicks;
     private double _minRtt = double.MaxValue;
     private double _maxRtt;
     private double _totalRtt;
@@ -23,6 +27,7 @@ internal sealed class PingStats
         lock (_lock)
         {
             _received++;
+            _lastReplyTicks = Stopwatch.GetTimestamp();
             _totalRtt += rtt;
             if (rtt < _minRtt)
             {
@@ -32,6 +37,14 @@ internal sealed class PingStats
             {
                 _maxRtt = rtt;
             }
+        }
+    }
+
+    public void RecordTimeout()
+    {
+        lock (_lock)
+        {
+            _timeouts++;
         }
     }
 
@@ -48,13 +61,19 @@ internal sealed class PingStats
         lock (_lock)
         {
             bool hasReplies = _received > 0;
+            double lastReplyAgeMs = _lastReplyTicks == 0
+                ? -1
+                : Stopwatch.GetElapsedTime(_lastReplyTicks).TotalMilliseconds;
+
             return new PingSummary(
                 _transmitted,
                 _received,
+                _timeouts,
                 _corrupted,
                 hasReplies ? _minRtt : 0,
                 hasReplies ? _totalRtt / _received : 0,
-                hasReplies ? _maxRtt : 0);
+                hasReplies ? _maxRtt : 0,
+                lastReplyAgeMs);
         }
     }
 }
@@ -62,10 +81,12 @@ internal sealed class PingStats
 internal readonly record struct PingSummary(
     long Transmitted,
     long Received,
+    long Timeouts,
     long Corrupted,
     double MinRtt,
     double AverageRtt,
-    double MaxRtt)
+    double MaxRtt,
+    double LastReplyAgeMs)
 {
     public double LossPercent
     {

@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Scriba;
@@ -10,6 +9,7 @@ internal static class Program
 {
     private static PingServer? _server;
     private static PingClient? _client;
+    private static PingLog? _log;
 
     private static async Task<int> Main(string[] args)
     {
@@ -24,21 +24,19 @@ internal static class Program
             return 1;
         }
 
-        if (options.Verbose)
-        {
-            StaticLogger.Instance.AddConsumer(new StderrLogConsumer());
-            StaticLogger.Instance.LogTime = true;
-        }
-
+        string role = options.Mode == PingMode.Server ? "server" : "client";
+        _log = new PingLog(role, options.Verbose);
+        StaticLogger.Instance.AddConsumer(new TransportLogConsumer(role, options.Verbose));
+        StaticLogger.Instance.LogTime = true;
         ILogger logger = StaticLogger.Instance;
 
         if (options.Mode == PingMode.Server)
         {
-            _server = new PingServer(options.Url, logger);
+            _server = new PingServer(options, logger, _log);
         }
         else
         {
-            _client = new PingClient(options, logger);
+            _client = new PingClient(options, logger, _log);
         }
 
         PosixSignalRegistration? sigterm = null;
@@ -71,11 +69,10 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error: {ex.Message}");
-            if (options.Verbose)
-            {
-                logger.wtf(ex);
-            }
+            _log.Error(
+                "fatal",
+                ("message", ex.Message),
+                ("exception", ex.ToString()));
             return 1;
         }
         finally
@@ -87,40 +84,14 @@ internal static class Program
 
     private static void RequestShutdown(string signal)
     {
+        _log?.Event("signal", ("signal", signal));
+
         if (_client != null)
         {
-            Console.Error.WriteLine($"Received {signal}. Shutting down...");
             _client.RequestShutdown();
             return;
         }
 
-        if (_server != null)
-        {
-            Console.Out.WriteLine($"Received {signal}. Shutting down...");
-            _server.Stop();
-        }
-    }
-}
-
-internal sealed class StderrLogConsumer : MultiRefLogConsumer
-{
-    public ILogFormatter Formatter { get; set; } = new SynchronizedLogFormatter(DefaultFormatter);
-
-    public override void Message(MessageData logMessage)
-    {
-        Formatter.Format(logMessage, Console.Error);
-    }
-
-    private static void DefaultFormatter(MessageData logMessage, TextWriter dst)
-    {
-        dst.Write(logMessage.Severity);
-        dst.Write(": ");
-        if (logMessage.WriteTimeTo(dst))
-        {
-            dst.Write(": ");
-        }
-        logMessage.WriteMessageTo(dst);
-        logMessage.WriteStackTrace("\t", dst);
-        dst.WriteLine();
+        _server?.Stop();
     }
 }
