@@ -17,6 +17,7 @@ public sealed class BridgeImpl : IBridge, IDisposable
     private readonly bool _verbose;
 
     private volatile bool _running;
+    private int _stopped;
     private Thread? _tunReaderThread;
     private IAckRawBaseEndpoint? _endpoint;
     private readonly object _endpointLock = new();
@@ -29,6 +30,7 @@ public sealed class BridgeImpl : IBridge, IDisposable
     private long _droppedPackets;
 
     public event Action<StopReason>? OnStopped;
+    public event Action<IAckRawBaseEndpoint>? EndpointConnected;
 
     public BridgeImpl(ITunDevice tun, IPacketBuffer buffer, ILogger logger, bool verbose = false)
     {
@@ -59,8 +61,11 @@ public sealed class BridgeImpl : IBridge, IDisposable
 
     public void Stop(StopReason reason)
     {
-        _running = false;
+        if (Interlocked.Exchange(ref _stopped, 1) != 0)
+            return;
 
+        _running = false;
+        _tun.Close();
         _tunReaderThread?.Join(TimeSpan.FromSeconds(5));
 
         OnEndpointDisconnected();
@@ -127,6 +132,7 @@ public sealed class BridgeImpl : IBridge, IDisposable
         }
 
         _logger.i("Pontifex endpoint connected.");
+        EndpointConnected?.Invoke(endpoint);
 
         while (_running && _buffer.TryDequeue(out byte[] packet))
         {
@@ -200,7 +206,11 @@ public sealed class BridgeImpl : IBridge, IDisposable
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _stopped, 1) != 0)
+            return;
+
         _running = false;
+        _tun.Close();
         _tunReaderThread?.Join(TimeSpan.FromSeconds(3));
     }
 }

@@ -204,7 +204,7 @@ PigeonPost --role <server|client|debug> --tun <name> [--tun <name2> ...] --url <
 PigeonPost --role server --tun tun0 --url 'tcp|0.0.0.0:9000/30'
 
 # Client connecting to the server, bridging tun1
-PigeonPost --role client --tun tun1 --url 'tcp|10.0.0.1:9000/30'
+PigeonPost --role client --tun tun1 --url 'tcp|10.0.10.1:9000/30'
 
 # Debug mode with three clients
 PigeonPost --role debug --debug-clients 3 --url 'direct|ep_debug'
@@ -264,10 +264,6 @@ All roles share the same multi-stage build:
 - **Runtime stage**: `dotnet/runtime:10.0` — installs `iproute2`, copies app + entrypoint
 - Entrypoint: `docker-entrypoint.sh` which creates/configures the TUN device, then execs the app
 
-### Shared entrypoint script (`docker/docker-entrypoint.sh`)
-Reads env vars `TUN_NAME`, `TUN_IP`, `PEER_IP`. Creates the TUN device with `ip tuntap add`,
-assigns the /30 IP, brings it up, adds a route to the peer, then `exec dotnet /app/PigeonPost.dll "$@"`.
-
 ### Deployment uses host networking
 Production `docker-compose.yml` files use `network_mode: host` with `NET_ADMIN` capability
 and `/dev/net/tun` device. This gives the container direct access to the host's network stack.
@@ -276,6 +272,26 @@ and `/dev/net/tun` device. This gives the container direct access to the host's 
 The test `docker-compose.yml` uses a `pigeon-net` bridge network. Each container gets its own
 network namespace with a TUN device, and iperf3 sidecars attach via `network_mode: "service:..."`.
 TCP connect timeouts are 30 seconds (hardcoded in URLs).
+
+### Unified VPN client subnet
+
+All PigeonPost clients (Linux TUN and future endpoint clients) use host IPs from a
+single VPN client subnet on the server TUN interface. Key contract:
+
+- **Client subnet**: `10.0.10.0/24` — all VPN-capable clients use this space.
+- **Server TUN address**: `10.0.10.1/24` — assigned to the server TUN device.
+- **Linux client range**: `10.0.10.2–10` — full peer reachability (can reach all clients).
+- **Endpoint/mobile client range**: `10.0.10.11–254` — isolated from other VPN peers (can only reach server and internet).
+- Each client advertises one unique host IP from `10.0.10.0/24`.
+- The connected route for `10.0.10.0/24` via `tun0` is the return-path mechanism for de-NATed replies.
+- The server NATs the full `10.0.10.0/24` subnet to the WAN.
+- Endpoint isolation is enforced by `VpnSubnetClassifier` in the packet path: endpoint→VPN-peer and Linux→endpoint packets are dropped.
+
+### Shared entrypoint script (`docker/docker-entrypoint.sh`)
+Reads env vars `TUN_NAME`, `TUN_CIDR`, and optional `PEER_IP`. Creates the TUN device,
+assigns `$TUN_CIDR`, brings it up. If `PEER_IP` is set (client role), adds a host route
+to the peer via the TUN. On the server, `PEER_IP` is omitted — the connected subnet route
+handles return traffic. Then `exec dotnet /app/PigeonPost.dll "$@"`.
 
 ### Deployment scripts
 
@@ -292,8 +308,9 @@ to one must be mirrored in the other:
 | `deploy/client/deploy-docker.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 | `deploy/client/deploy-plain.sh` | Client | `tcp\|203.0.113.10:9000/30` |
 
-Client deployment artifacts link to the pre-configured `CLIENT_ID` variable.
-Current client helper scripts default `CLIENT_ID` to `pp-client-1` if not set.
+Client deployment artifacts use `TUN_CIDR` and `PEER_IP` for real network identity.
+`CLIENT_ID` is a cosmetic label only — it does not affect the protocol identity.
+Each client must get a **unique** TUN IP from the unified VPN client subnet.
 
 ### Idempotency Requirements
 
@@ -317,10 +334,11 @@ twice and confirm the second run produces zero errors and no duplicate rules or 
 ### Host setup scripts
 
 - **Server** (`deploy/server/pre-deploy.sh`): Creates TUN, enables IP forwarding, NAT from tunnel
-  subnet to WAN interface (`POSTROUTING -o $WAN_IF -s 10.0.0.0/30`).
-- **Client** (`deploy/client/pre-deploy.sh`): Creates TUN, enables IP forwarding, NAT to tunnel
-  (`POSTROUTING -o tun0`), sets up ipset `pp-ingress` + mangle rule referencing it, sets up policy
-  routing table 234.
+  subnet to WAN interface (`POSTROUTING -o $WAN_IF -s 10.0.10.0/24`). Provisions the unified
+  client subnet (`10.0.10.1/24` on `tun0`) and FORWARD allow rules.
+- **Client** (`deploy/client/pre-deploy.sh`): Creates TUN (default `tun0`), assigns the configured
+  `TUN_CIDR`, adds route to `PEER_IP`, enables IP forwarding, NAT to tunnel (`POSTROUTING -o $TUN_NAME`),
+  sets up ipset `pp-ingress` + mangle rule referencing it, sets up policy routing table 234.
 
 ### Ingress scripts (`deploy/client/ingress/`)
 Ingress scripts register traffic sources (e.g. LAN subnet, PPTP pool, WireGuard peers) into the

@@ -1,0 +1,79 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PigeonPost.VpnClientView.ViewModels"
+             x:Class="PigeonPost.VpnClientView.Views.ConfigView"
+             x:DataType="vm:ConfigViewModel">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+          ColumnDefinitions="Auto,*"
+          Margin="24">
+
+        <TextBlock Text="VPN Configuration"
+                   FontSize="20"
+                   FontWeight="Bold"
+                   Grid.ColumnSpan="2"
+                   Margin="0,0,0,16" />
+
+        <Border Grid.Row="1"
+                Grid.ColumnSpan="2"
+                Background="#3E2723"
+                CornerRadius="6"
+                Padding="12,8"
+                Margin="0,0,0,12"
+                IsVisible="{Binding IsReconnectWarningVisible}">
+            <StackPanel Spacing="4">
+                <TextBlock Text="A session is currently active. Changing settings will disconnect it."
+                           Foreground="#FFB74D"
+                           FontSize="13"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="Disconnecting will end the session immediately."
+                           Foreground="#FF8A65"
+                           FontSize="12"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Text="Server URL:"
+                   Grid.Row="2"
+                   VerticalAlignment="Center"
+                   Margin="0,0,8,8" />
+        <TextBox Text="{Binding ServerUrl}"
+                 Grid.Row="2"
+                 Grid.Column="1"
+                 Watermark="tcp|host:port/timeout"
+                 MinWidth="300"
+                 AutomationProperties.Name="Server URL" />
+
+        <TextBlock Text="Client IP last octet (11-254):"
+                   Grid.Row="3"
+                   VerticalAlignment="Center"
+                   Margin="0,8,8,0" />
+        <TextBox Text="{Binding ClientIpLastOctet}"
+                 Grid.Row="3"
+                 Grid.Column="1"
+                 Watermark="11-254"
+                 Margin="0,8,0,0"
+                 MinWidth="100"
+                 AutomationProperties.Name="Client IP last octet" />
+
+        <TextBlock Text="{Binding FullIpPreview}"
+                   Grid.Row="4"
+                   Grid.Column="1"
+                   FontSize="16"
+                   FontFamily="Consolas, monospace"
+                   Margin="0,8,0,0" />
+
+        <ItemsControl ItemsSource="{Binding Errors}"
+                      Grid.Row="5"
+                      Grid.ColumnSpan="2"
+                      Margin="0,8,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}"
+                               Foreground="Red"
+                               FontSize="12"
+                               Margin="0,2" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</UserControl>

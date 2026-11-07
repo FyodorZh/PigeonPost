@@ -14,8 +14,7 @@ services:
       - /dev/net/tun
     environment:
       TUN_NAME: tun0
-      TUN_IP: 10.0.0.1
-      PEER_IP: 10.0.0.2
+      TUN_CIDR: 10.0.10.1/24
     command: --role server --tun tun0 --url 'tcp|0.0.0.0:9000/30'
     networks:
       - pigeon-net
@@ -38,8 +37,8 @@ services:
     hostname: pigeonpost-client-1
     environment:
       TUN_NAME: tun0
-      TUN_IP: 10.0.0.2
-      PEER_IP: 10.0.0.1
+      TUN_CIDR: 10.0.10.11/24
+      PEER_IP: 10.0.10.1
     depends_on:
       - server
     command: --role client --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
@@ -50,8 +49,8 @@ services:
     hostname: pigeonpost-client-2
     environment:
       TUN_NAME: tun0
-      TUN_IP: 10.0.0.6
-      PEER_IP: 10.0.0.1
+      TUN_CIDR: 10.0.10.12/24
+      PEER_IP: 10.0.10.1
     depends_on:
       - server
     command: --role client --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
@@ -62,8 +61,8 @@ services:
     hostname: pigeonpost-client-3
     environment:
       TUN_NAME: tun0
-      TUN_IP: 10.0.0.9
-      PEER_IP: 10.0.0.1
+      TUN_CIDR: 10.0.10.13/24
+      PEER_IP: 10.0.10.1
     depends_on:
       - server
     command: --role client --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
@@ -74,8 +73,8 @@ services:
     hostname: pigeonpost-client-4
     environment:
       TUN_NAME: tun0
-      TUN_IP: 10.0.0.13
-      PEER_IP: 10.0.0.1
+      TUN_CIDR: 10.0.10.14/24
+      PEER_IP: 10.0.10.1
     depends_on:
       - server
     command: --role client --tun tun0 --url 'tcp|pigeonpost-server:9000/30'
